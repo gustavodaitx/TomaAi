@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.tomai.data.repository.MedicamentoRepository
 import br.com.tomai.data.repository.MedicamentoRepositoryImpl
+import br.com.tomai.data.repository.DoseRepository
+import br.com.tomai.data.repository.DoseRepositoryImpl
+import br.com.tomai.model.Dose
 import br.com.tomai.model.HorarioMedicamento
 import br.com.tomai.model.Medicamento
 import kotlinx.coroutines.Job
@@ -15,7 +18,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class MedicamentoViewModel(
-    private val repository: MedicamentoRepository = MedicamentoRepositoryImpl()
+    private val repository: MedicamentoRepository = MedicamentoRepositoryImpl(),
+    private val doseRepository: DoseRepository = DoseRepositoryImpl()
 ) : ViewModel() {
 
     private var observacaoJob: Job? = null
@@ -188,9 +192,21 @@ class MedicamentoViewModel(
         viewModelScope.launch {
             try {
                 repository.salvar(medicamento).fold(
-                    onSuccess = {
+                    onSuccess = { salvo ->
+                    val geracao = doseRepository.garantirAgendaDiaria(
+                        usuarioId = salvo.usuarioId,
+                        medicamentos = listOf(salvo),
+                        dataAgenda = Dose.dataHoje()
+                    )
+                    if (geracao.isFailure) {
+                        _uiState.update {
+                            it.copy(medicamentoEmEdicao = salvo, erro = "Medicamento salvo, mas não foi possível gerar as doses de hoje: ${geracao.exceptionOrNull()?.localizedMessage ?: "erro desconhecido"}")
+                        }
+                        return@fold
+                    }
                     _uiState.update {
                         it.copy(
+                            medicamentoEmEdicao = salvo,
                             sucessoMensagem = "Medicamento salvo com sucesso."
                         )
                     }

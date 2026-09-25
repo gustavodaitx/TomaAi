@@ -66,7 +66,7 @@ class DoseRepositoryImpl(
             .await()
         return snapshot.documents.mapNotNull { document ->
             runCatching { Dose.fromFirestoreMap(document.id, document.data ?: emptyMap()) }.getOrNull()
-        }.sortedWith(compareBy<Dose> { it.dataAgenda }.thenBy { it.horarioProgramado })
+        }.sortedWith(compareByDescending<Dose> { it.dataAgenda }.thenByDescending { it.horarioProgramado })
     }
 
     override suspend fun garantirAgendaDiaria(
@@ -103,9 +103,12 @@ class DoseRepositoryImpl(
                             "usuarioId" to usuarioId,
                             "medicamentoId" to medicamento.id,
                             "medicamentoNome" to medicamento.nome,
+                            "nomeMedicamento" to medicamento.nome,
                             "dosagem" to medicamento.dosagem,
                             "dataAgenda" to dataAgenda,
+                            "data" to dataAgenda,
                             "horarioProgramado" to horario.hora,
+                            "horario" to horario.hora,
                             "status" to Dose.STATUS_PENDENTE,
                             "criadoEm" to FieldValue.serverTimestamp()
                         )
@@ -114,6 +117,7 @@ class DoseRepositoryImpl(
                     } else {
                         val meta = mapOf(
                             "medicamentoNome" to medicamento.nome,
+                            "nomeMedicamento" to medicamento.nome,
                             "dosagem" to medicamento.dosagem
                         )
                         batch.set(docRef, meta, SetOptions.merge())

@@ -78,10 +78,10 @@ data class Dose(
                 id = id,
                 usuarioId = data["usuarioId"] as? String ?: "",
                 medicamentoId = data["medicamentoId"] as? String ?: "",
-                medicamentoNome = data["medicamentoNome"] as? String ?: "",
+                medicamentoNome = data["medicamentoNome"] as? String ?: data["nomeMedicamento"] as? String ?: "",
                 dosagem = data["dosagem"] as? String ?: "",
-                dataAgenda = data["dataAgenda"] as? String ?: "",
-                horarioProgramado = data["horarioProgramado"] as? String ?: "",
+                dataAgenda = data["dataAgenda"] as? String ?: data["data"] as? String ?: "",
+                horarioProgramado = data["horarioProgramado"] as? String ?: data["horario"] as? String ?: "",
                 status = data["status"] as? String ?: STATUS_PENDENTE,
                 confirmadaEm = data["confirmadaEm"] as? Timestamp,
                 criadoEm = data["criadoEm"] as? Timestamp

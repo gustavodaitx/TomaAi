@@ -39,7 +39,7 @@ service cloud.firestore {
       allow update: if ownsExisting()
         && request.resource.data.usuarioId == resource.data.usuarioId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'confirmadaEm'
+          'status', 'confirmadaEm', 'medicamentoNome', 'nomeMedicamento', 'dosagem'
         ])
         && request.resource.data.status in [
           'PENDENTE', 'CONFIRMADA', 'IGNORADA', 'NAO_CONFIRMADA'

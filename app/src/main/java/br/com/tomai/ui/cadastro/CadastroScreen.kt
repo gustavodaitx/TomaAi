@@ -56,9 +56,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import br.com.tomai.ui.components.AppButton
 import br.com.tomai.ui.components.AppTextField
 import br.com.tomai.viewmodel.AuthViewModel
+import br.com.tomai.ui.components.TomaAiLogo
+import br.com.tomai.ui.theme.TomaAiTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +97,7 @@ fun CadastroScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = "Criar Conta") },
+                title = { TomaAiLogo(size = 52.dp) },
                 navigationIcon = {
                     IconButton(onClick = onVoltarParaLogin) {
                         Icon(
@@ -332,6 +335,17 @@ fun CadastroScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CadastroScreenPreview() {
+    TomaAiTheme {
+        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            TomaAiLogo(size = 100.dp)
+            Text("Criar Conta", style = MaterialTheme.typography.headlineSmall)
         }
     }
 }

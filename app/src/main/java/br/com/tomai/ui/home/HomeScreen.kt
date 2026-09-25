@@ -38,8 +38,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import br.com.tomai.ui.components.TomaAiLogo
 import br.com.tomai.ui.components.DoseCard
+import br.com.tomai.ui.theme.TomaAiTheme
 import br.com.tomai.model.Dose
 import br.com.tomai.viewmodel.AssinaturaViewModel
 import br.com.tomai.viewmodel.AuthViewModel
@@ -175,6 +177,18 @@ private fun QuickAction(title: String, icon: androidx.compose.ui.graphics.vector
             verticalArrangement = Arrangement.Center) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             Text(title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenPreview() {
+    TomaAiTheme {
+        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            TomaAiLogo(size = 56.dp)
+            Text("Doses de hoje", style = MaterialTheme.typography.titleLarge)
+            DoseCard("Vitamina D", "1 comprimido", "08:00", Dose.STATUS_PENDENTE, onConfirmarClick = {})
         }
     }
 }

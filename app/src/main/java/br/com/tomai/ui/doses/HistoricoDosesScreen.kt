@@ -42,8 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import br.com.tomai.model.Dose
 import br.com.tomai.ui.components.StatusChip
+import br.com.tomai.ui.components.TomaAiLogo
+import br.com.tomai.ui.theme.TomaAiTheme
 import br.com.tomai.viewmodel.DoseViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -53,6 +56,20 @@ private enum class PeriodoHistorico(val titulo: String, val dias: Long) {
     HOJE("Hoje", 0),
     SEMANA("Semana", 6),
     MES("Mês", 29)
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HistoricoDosesScreenPreview() {
+    TomaAiTheme {
+        Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center) {
+            TomaAiLogo(size = 96.dp)
+            Text("Nenhuma dose encontrada para esta data", Modifier.padding(top = 12.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleMedium)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,7 +91,12 @@ fun HistoricoDosesScreen(usuarioId: String, viewModel: DoseViewModel, onVoltar: 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (doseSelecionada == null) "Histórico de doses" else "Detalhes da dose", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TomaAiLogo(size = 42.dp)
+                        Text(if (doseSelecionada == null) "Histórico de doses" else "Detalhes da dose", fontWeight = FontWeight.Bold)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { if (doseSelecionada != null) doseSelecionada = null else onVoltar() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
@@ -122,8 +144,16 @@ fun HistoricoDosesScreen(usuarioId: String, viewModel: DoseViewModel, onVoltar: 
                         verticalArrangement = Arrangement.Center) { CircularProgressIndicator() }
                     state.erroHistorico != null -> Text(state.erroHistorico.orEmpty(),
                         Modifier.padding(20.dp), color = MaterialTheme.colorScheme.error)
-                    state.historico.isEmpty() -> Text("Nenhuma dose encontrada neste período.",
-                        Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    state.historico.isEmpty() -> Column(
+                        Modifier.fillMaxSize().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        TomaAiLogo(size = 96.dp)
+                        Text("Nenhuma dose encontrada para esta data", Modifier.padding(top = 12.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.titleMedium)
+                    }
                     else -> LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(state.historico.filter { medicamentoFiltro == "Todos" || it.medicamentoNome == medicamentoFiltro }, key = { it.id }) { dose ->

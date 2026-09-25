@@ -53,8 +53,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import br.com.tomai.ui.components.AppButton
 import br.com.tomai.ui.components.AppTextField
+import br.com.tomai.ui.components.TomaAiLogo
+import br.com.tomai.ui.theme.TomaAiTheme
 import br.com.tomai.viewmodel.AuthViewModel
 
 @Composable
@@ -98,6 +101,8 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            TomaAiLogo(size = 112.dp)
+
             // Logotipo e Cabeçalho
             Box(
                 modifier = Modifier
@@ -291,6 +296,17 @@ fun LoginScreen(
             }
                 }
             }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LoginScreenPreview() {
+    TomaAiTheme {
+        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            TomaAiLogo(size = 112.dp)
+            Text("Gestão inteligente de medicamentos e cuidados", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
