@@ -1,70 +1,107 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import { FcmNotificationService } from "../notifications/notificationService";
+import { ResendEmailNotificationService } from "../notifications/emailNotificationService";
 
-const fcmNotifier = new FcmNotificationService();
-const LIMITE_ATRASO_MS = 30 * 60 * 1000;
+const emailNotifier = new ResendEmailNotificationService();
+const TOLERANCIA_ATRASO_MS = 30 * 60 * 1000;
+const TRAVA_EXPIRA_MS = 10 * 60 * 1000;
 
-export const verificarDosesNaoConfirmadas = functions.pubsub
-  .schedule("every 15 minutes")
+function dataHojeSaoPaulo(agora: Date): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(agora);
+  const data = Object.fromEntries(partes.map(({ type, value }) => [type, value]));
+  return `${data.year}-${data.month}-${data.day}`;
+}
+
+function obterInstanteProgramado(dataAgenda: string, horario: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataAgenda) || !/^\d{2}:\d{2}$/.test(horario)) return NaN;
+  return new Date(`${dataAgenda}T${horario}:00-03:00`).getTime();
+}
+
+export const verificarDosesNaoConfirmadas = functions
+  .runWith({ secrets: ["RESEND_API_KEY"], timeoutSeconds: 120 })
+  .pubsub.schedule("every 5 minutes")
   .timeZone("America/Sao_Paulo")
   .onRun(async () => {
     const db = admin.firestore();
-    const agora = new Date();
-    const partesData = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Sao_Paulo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).formatToParts(agora);
-    const dataLocal = Object.fromEntries(partesData.map(({ type, value }) => [type, value]));
-    const hojeLocal = `${dataLocal.year}-${dataLocal.month}-${dataLocal.day}`;
+    const agoraMs = Date.now();
+    const hoje = dataHojeSaoPaulo(new Date(agoraMs));
     const snapshot = await db.collection("doses")
       .where("status", "==", "PENDENTE")
-      .where("dataAgenda", "==", hojeLocal)
+      .where("dataAgenda", "==", hoje)
       .get();
-    const limite = Date.now() - LIMITE_ATRASO_MS;
-    const batch = db.batch();
-    const notificacoes: Array<() => Promise<void>> = [];
 
     for (const doseDoc of snapshot.docs) {
-      const dose = doseDoc.data();
-      const programado = new Date(`${dose.dataAgenda}T${dose.horarioProgramado}:00-03:00`).getTime();
-      if (!Number.isFinite(programado) || programado > limite) continue;
-      const usuarioRef = db.collection("usuarios").doc(dose.usuarioId);
-      const usuario = (await usuarioRef.get()).data();
-      const responsavelId = usuario?.responsavelPadraoId;
+      // Re-read immediately before alerting so a just-confirmed dose is not reported.
+      const atual = await doseDoc.ref.get();
+      if (!atual.exists || atual.get("status") !== "PENDENTE") continue;
+      const dose = atual.data() || {};
+      const dataAgenda = String(dose.dataAgenda || dose.data || "");
+      const horario = String(dose.horarioProgramado || dose.horario || "");
+      const instanteProgramado = obterInstanteProgramado(dataAgenda, horario);
+      if (!Number.isFinite(instanteProgramado) || agoraMs < instanteProgramado + TOLERANCIA_ATRASO_MS) continue;
+
+      const usuarioId = String(dose.usuarioId || "");
+      if (!usuarioId) continue;
+      const usuario = (await db.collection("usuarios").doc(usuarioId).get()).data();
+      const responsavelId = String(usuario?.responsavelPadraoId || "");
       if (!responsavelId) continue;
       const pessoaRef = db.collection("pessoas_confianca").doc(responsavelId);
       const pessoa = (await pessoaRef.get()).data();
-      if (!pessoa || pessoa.usuarioId !== dose.usuarioId || pessoa.aceitouReceberAvisos !== true) continue;
+      if (!pessoa || pessoa.usuarioId !== usuarioId || pessoa.aceitouReceberAvisos !== true) continue;
 
       const alertaRef = db.collection("alertas").doc(doseDoc.id);
-      const existente = await alertaRef.get();
-      const recipient = typeof pessoa.fcmToken === "string" ? pessoa.fcmToken.trim() : "";
-      if (existente.exists && existente.get("status") !== "PENDENTE_ENVIO" &&
-          !(existente.get("status") === "SEM_CANAL_CONFIGURADO" && recipient)) continue;
-      batch.set(alertaRef, {
-        usuarioId: dose.usuarioId,
-        responsavelId,
-        doseId: doseDoc.id,
-        medicamentoNome: dose.medicamentoNome || "Medicamento",
-        horarioProgramado: dose.horarioProgramado,
-        status: recipient ? "PENDENTE_ENVIO" : "SEM_CANAL_CONFIGURADO",
-        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-      if (recipient) {
-        notificacoes.push(async () => {
-          await fcmNotifier.notify(
-            recipient,
-            "Dose não confirmada",
-            `A dose de ${dose.medicamentoNome || "um medicamento"} ainda não foi confirmada.`
-          );
-          await alertaRef.update({ status: "ENVIADA", enviadaEm: admin.firestore.FieldValue.serverTimestamp() });
+      const podeEnviar = await db.runTransaction(async (transaction) => {
+        const alerta = await transaction.get(alertaRef);
+        if (alerta.get("status") === "ENVIADA") return false;
+        const processandoEm = alerta.get("processandoEm") as admin.firestore.Timestamp | undefined;
+        if (alerta.get("status") === "PROCESSANDO" && processandoEm &&
+          agoraMs - processandoEm.toMillis() < TRAVA_EXPIRA_MS) return false;
+        transaction.set(alertaRef, {
+          usuarioId,
+          responsavelId,
+          doseId: doseDoc.id,
+          medicamentoNome: dose.medicamentoNome || dose.nomeMedicamento || "Medicamento",
+          horarioProgramado: horario,
+          dataAgenda,
+          status: "PROCESSANDO",
+          processandoEm: admin.firestore.FieldValue.serverTimestamp(),
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return true;
+      });
+      if (!podeEnviar) continue;
+
+      const alertaNome = String(dose.medicamentoNome || dose.nomeMedicamento || "Medicamento");
+      const email = String(pessoa.email || "").trim();
+      if (!email) {
+        await alertaRef.update({ status: "SEM_EMAIL_CADASTRADO", erro: "A pessoa de confiança não tem e-mail cadastrado." });
+        continue;
+      }
+
+      try {
+        await emailNotifier.sendDoseReminder(
+          email,
+          String(usuario?.nome || "paciente"),
+          alertaNome,
+          horario,
+          `dose-alert/${doseDoc.id}`
+        );
+        await alertaRef.update({
+          status: "ENVIADA",
+          enviadaEm: admin.firestore.FieldValue.serverTimestamp(),
+          erro: admin.firestore.FieldValue.delete(),
+        });
+      } catch (error) {
+        const mensagem = error instanceof Error ? error.message : "Falha desconhecida ao enviar e-mail.";
+        console.error(`Falha no alerta da dose ${doseDoc.id}: ${mensagem}`);
+        await alertaRef.update({
+          status: "FALHA_ENVIO",
+          erro: mensagem.slice(0, 500),
+          atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
     }
-    await batch.commit();
-    await Promise.all(notificacoes.map((enviar) => enviar()));
     return null;
   });

@@ -128,7 +128,7 @@ fun PessoasConfiancaScreen(
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    Text("O envio de avisos depende de um canal de notificação configurado.",
+                    Text("Com a pessoa definida como padrão e os avisos ativados, um e-mail é enviado se a dose continuar pendente por 30 minutos.",
                         style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(24.dp))
@@ -157,7 +157,7 @@ fun PessoasConfiancaScreen(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("Receber aviso quando uma dose não for confirmada",
+                                Text("Receber e-mail se uma dose ficar sem confirmação por 30 minutos",
                                     Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 Switch(checked = aceitouAvisos, onCheckedChange = { aceitouAvisos = it })
                             }
