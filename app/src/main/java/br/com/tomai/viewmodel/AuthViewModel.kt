@@ -1,10 +1,12 @@
 package br.com.tomai.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.tomai.data.repository.AuthRepository
 import br.com.tomai.data.repository.AuthRepositoryImpl
 import br.com.tomai.model.Usuario
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,14 +15,22 @@ import kotlinx.coroutines.launch
 
 /**
  * ViewModel responsável pela autenticação, cadastro, recuperação de senha e sessão do usuário.
+ * Sincroniza em tempo real com o Cloud Firestore.
  */
 class AuthViewModel(
     private val authRepository: AuthRepository = AuthRepositoryImpl()
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "TomaAi_AuthViewModel"
+    }
+
+    private var perfilObservationJob: Job? = null
+
     private val _uiState = MutableStateFlow(
         AuthUiState(
             estaAutenticado = authRepository.estaAutenticado(),
+            firestoreUid = authRepository.obterUsuarioAtualId(),
             usuario = authRepository.obterUsuarioAtualId()?.let { uid ->
                 Usuario(id = uid, perfil = Usuario.PERFIL_PACIENTE)
             }
@@ -35,26 +45,58 @@ class AuthViewModel(
     }
 
     fun obterUidAutenticado(): String? {
-        return authRepository.obterUsuarioAtualId()
+        val uid = authRepository.obterUsuarioAtualId()
+        Log.d(TAG, "obterUidAutenticado: $uid")
+        return uid
     }
 
-    private fun observarUsuarioAtual() {
-        viewModelScope.launch {
-            authRepository.usuarioAtualFlow.collect { usuario ->
-                _uiState.update { estadoAtual ->
-                    estadoAtual.copy(
-                        usuario = usuario ?: if (authRepository.estaAutenticado()) {
-                            authRepository.obterUsuarioAtualId()?.let { uid ->
-                                Usuario(id = uid, perfil = Usuario.PERFIL_PACIENTE)
-                            }
-                        } else null,
-                        estaAutenticado = usuario != null || authRepository.estaAutenticado()
+    /**
+     * Inicia a observação reativa do documento /usuarios/{uid} em tempo real via Firestore listener.
+     */
+    fun observarUsuarioFirestore(uid: String) {
+        if (uid.isBlank()) {
+            Log.e(TAG, "observarUsuarioFirestore: UID informado está em branco.")
+            return
+        }
+
+        Log.d(TAG, "observarUsuarioFirestore: Conectando listener em tempo real para UID: $uid")
+        perfilObservationJob?.cancel()
+        perfilObservationJob = viewModelScope.launch {
+            authRepository.observarPerfil(uid).collect { usuarioAtualizado ->
+                Log.d(TAG, "observarUsuarioFirestore: Dados recebidos do Firestore para UID: $uid: $usuarioAtualizado")
+                val uidFinal = usuarioAtualizado?.id?.takeIf { it.isNotBlank() } ?: uid
+                _uiState.update { estado ->
+                    estado.copy(
+                        usuario = usuarioAtualizado ?: estado.usuario,
+                        firestoreUid = uidFinal,
+                        estaAutenticado = true
                     )
                 }
             }
         }
     }
 
+    private fun observarUsuarioAtual() {
+        viewModelScope.launch {
+            authRepository.usuarioAtualFlow.collect { usuario ->
+                Log.d(TAG, "observarUsuarioAtual: usuarioAtualFlow emitiu: $usuario")
+                val uid = usuario?.id?.takeIf { it.isNotBlank() } ?: authRepository.obterUsuarioAtualId()
+                _uiState.update { estadoAtual ->
+                    estadoAtual.copy(
+                        usuario = usuario ?: if (authRepository.estaAutenticado()) {
+                            uid?.let { Usuario(id = it, perfil = Usuario.PERFIL_PACIENTE) }
+                        } else null,
+                        firestoreUid = uid,
+                        estaAutenticado = usuario != null || authRepository.estaAutenticado()
+                    )
+                }
+
+                if (!uid.isNullOrBlank() && perfilObservationJob == null) {
+                    observarUsuarioFirestore(uid)
+                }
+            }
+        }
+    }
 
     fun login(email: String, senha: String, onSucesso: () -> Unit = {}) {
         val erroValidacao = validarCamposLogin(email, senha)
@@ -66,20 +108,25 @@ class AuthViewModel(
         _uiState.update { it.copy(isLoading = true, erro = null, sucessoMensagem = null) }
 
         viewModelScope.launch {
+            Log.d(TAG, "login: Disparando autenticação para $email")
             val resultado = authRepository.login(email = email, senha = senha)
             resultado.fold(
                 onSuccess = { usuario ->
+                    Log.d(TAG, "login: Sucesso para UID: ${usuario.id}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             usuario = usuario,
+                            firestoreUid = usuario.id,
                             estaAutenticado = true,
                             erro = null
                         )
                     }
+                    observarUsuarioFirestore(usuario.id)
                     onSucesso()
                 },
                 onFailure = { falha ->
+                    Log.e(TAG, "login: Falha ao autenticar: ${falha.message}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -107,21 +154,26 @@ class AuthViewModel(
         _uiState.update { it.copy(isLoading = true, erro = null, sucessoMensagem = null) }
 
         viewModelScope.launch {
+            Log.d(TAG, "cadastrar: Disparando cadastro para $email")
             val resultado = authRepository.cadastrar(nome = nome, email = email, senha = senha)
             resultado.fold(
                 onSuccess = { usuario ->
+                    Log.d(TAG, "cadastrar: Sucesso para UID: ${usuario.id}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             usuario = usuario,
+                            firestoreUid = usuario.id,
                             estaAutenticado = true,
                             erro = null,
                             sucessoMensagem = "Conta criada com sucesso!"
                         )
                     }
+                    observarUsuarioFirestore(usuario.id)
                     onSucesso()
                 },
                 onFailure = { falha ->
+                    Log.e(TAG, "cadastrar: Falha ao cadastrar: ${falha.message}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -167,12 +219,16 @@ class AuthViewModel(
 
     fun logout(onConcluido: () -> Unit = {}) {
         viewModelScope.launch {
+            Log.d(TAG, "logout: Finalizando sessão e cancelando listeners")
+            perfilObservationJob?.cancel()
+            perfilObservationJob = null
             authRepository.logout()
             _uiState.update {
                 AuthUiState(
                     isLoading = false,
                     usuario = null,
-                    estaAutenticado = false
+                    estaAutenticado = false,
+                    firestoreUid = null
                 )
             }
             onConcluido()

@@ -164,6 +164,7 @@ class AuthViewModelTest {
         viewModel.login(email = "usuario@tomai.com", senha = "123456")
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.estaAutenticado)
+        assertEquals("mock_uid_123", viewModel.uiState.value.firestoreUid)
 
         viewModel.logout()
         advanceUntilIdle()
@@ -171,6 +172,38 @@ class AuthViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.estaAutenticado)
         assertNull(state.usuario)
+        assertNull(state.firestoreUid)
+    }
+
+    @Test
+    fun login_deveDefinirFirestoreUidNoEstado() = runTest {
+        viewModel.login(email = "usuario@tomai.com", senha = "123456")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.estaAutenticado)
+        assertEquals("mock_uid_123", state.firestoreUid)
+        assertEquals("mock_uid_123", state.usuario?.id)
+    }
+
+    @Test
+    fun observarUsuarioFirestore_deveAtualizarEstadoEmTempoReal() = runTest {
+        viewModel.observarUsuarioFirestore("uid_realtime_456")
+        advanceUntilIdle()
+
+        val usuarioAtualizado = Usuario(
+            id = "uid_realtime_456",
+            nome = "Paciente Atualizado",
+            email = "paciente@tomai.com",
+            perfil = Usuario.PERFIL_PACIENTE
+        )
+        fakeRepository.emitirAtualizacaoPerfil(usuarioAtualizado)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("uid_realtime_456", state.firestoreUid)
+        assertEquals("Paciente Atualizado", state.usuario?.nome)
+        assertEquals("paciente@tomai.com", state.usuario?.email)
     }
 }
 
@@ -180,6 +213,8 @@ class AuthViewModelTest {
 class FakeAuthRepository : AuthRepository {
     private val _usuarioAtualFlow = MutableStateFlow<Usuario?>(null)
     override val usuarioAtualFlow: Flow<Usuario?> = _usuarioAtualFlow
+
+    private val _perfilFlow = MutableStateFlow<Usuario?>(null)
 
     var deveFalhar: Boolean = false
     var mensagemFalha: String = "Erro simulado"
@@ -198,6 +233,7 @@ class FakeAuthRepository : AuthRepository {
             ativo = true
         )
         _usuarioAtualFlow.value = user
+        _perfilFlow.value = user
         return Result.success(user)
     }
 
@@ -211,6 +247,7 @@ class FakeAuthRepository : AuthRepository {
             ativo = true
         )
         _usuarioAtualFlow.value = user
+        _perfilFlow.value = user
         return Result.success(user)
     }
 
@@ -221,6 +258,7 @@ class FakeAuthRepository : AuthRepository {
 
     override suspend fun logout() {
         _usuarioAtualFlow.value = null
+        _perfilFlow.value = null
     }
 
     override suspend fun buscarPerfil(uid: String): Result<Usuario?> {
@@ -229,11 +267,16 @@ class FakeAuthRepository : AuthRepository {
 
     override suspend fun salvarPerfil(usuario: Usuario): Result<Unit> {
         _usuarioAtualFlow.value = usuario
+        _perfilFlow.value = usuario
         return Result.success(Unit)
     }
 
     override fun observarPerfil(uid: String): Flow<Usuario?> {
-        return _usuarioAtualFlow
+        return _perfilFlow
+    }
+
+    fun emitirAtualizacaoPerfil(usuario: Usuario) {
+        _perfilFlow.value = usuario
     }
 }
 

@@ -10,5 +10,6 @@ data class AuthUiState(
     val usuario: Usuario? = null,
     val estaAutenticado: Boolean = false,
     val erro: String? = null,
-    val sucessoMensagem: String? = null
+    val sucessoMensagem: String? = null,
+    val firestoreUid: String? = null
 )

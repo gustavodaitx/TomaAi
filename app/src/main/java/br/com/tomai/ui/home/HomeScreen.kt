@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -50,9 +51,24 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val usuario = uiState.usuario
-    val uidExibicao = usuario?.id?.ifBlank { viewModel.obterUidAutenticado() }
+    val uidExibicao = uiState.firestoreUid
+        ?: usuario?.id?.takeIf { it.isNotBlank() }
         ?: viewModel.obterUidAutenticado()
         ?: "N/D"
+
+    LaunchedEffect(Unit) {
+        val uidAtual = viewModel.obterUidAutenticado()
+        if (!uidAtual.isNullOrBlank()) {
+            viewModel.observarUsuarioFirestore(uidAtual)
+        }
+    }
+
+    LaunchedEffect(usuario?.id) {
+        val uid = usuario?.id
+        if (!uid.isNullOrBlank() && uiState.firestoreUid.isNullOrBlank()) {
+            viewModel.observarUsuarioFirestore(uid)
+        }
+    }
 
     Scaffold(
         topBar = {

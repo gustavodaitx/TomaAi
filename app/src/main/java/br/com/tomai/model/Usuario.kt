@@ -38,19 +38,39 @@ data class Usuario(
         const val PERFIL_PACIENTE = "PACIENTE"
         const val PERFIL_CUIDADOR = "CUIDADOR"
         const val PERFIL_ADMIN = "ADMIN"
+
+        fun criarPadrao(
+            uid: String,
+            email: String,
+            nome: String? = null
+        ): Usuario {
+            return Usuario(
+                id = uid,
+                nome = nome?.ifBlank { "Usuário TomaAí" } ?: "Usuário TomaAí",
+                email = email,
+                perfil = PERFIL_PACIENTE,
+                ativo = true,
+                criadoEm = Timestamp.now()
+            )
+        }
     }
 
     fun toMap(): Map<String, Any?> {
-        return mapOf(
+        val map = mutableMapOf<String, Any?>(
             "id" to id,
             "nome" to nome,
             "email" to email,
             "perfil" to perfil,
             "ativo" to ativo,
-            "criadoEm" to (criadoEm ?: Timestamp.now()),
-            "asaasCustomerId" to asaasCustomerId,
-            "responsavelPadraoId" to responsavelPadraoId
+            "criadoEm" to (criadoEm ?: Timestamp.now())
         )
+        if (asaasCustomerId != null) {
+            map["asaasCustomerId"] = asaasCustomerId
+        }
+        if (responsavelPadraoId != null) {
+            map["responsavelPadraoId"] = responsavelPadraoId
+        }
+        return map
     }
 }
 
