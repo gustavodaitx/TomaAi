@@ -1,39 +1,94 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function signedIn() { return request.auth != null; }
+    function owns(userId) { return signedIn() && request.auth.uid == userId; }
+    function ownsExisting() {
+      return signedIn() && resource.data.usuarioId == request.auth.uid;
     }
 
     match /usuarios/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if owns(userId);
+      allow create: if owns(userId)
+        && request.resource.data.keys().hasOnly([
+          'id', 'nome', 'email', 'perfil', 'ativo', 'criadoEm'
+        ])
+        && request.resource.data.id == userId
+        && request.resource.data.perfil == 'PACIENTE';
+      allow update: if owns(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nome', 'email', 'responsavelPadraoId'
+        ])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['responsavelPadraoId'])
+          || request.resource.data.responsavelPadraoId == null
+          || get(/databases/$(database)/documents/pessoas_confianca/$(request.resource.data.responsavelPadraoId)).data.usuarioId == userId);
+      allow delete: if false;
     }
 
     match /medicamentos/{medicamentoId} {
-      allow read: if isSignedIn()
-        && resource.data.usuarioId == request.auth.uid;
-      allow create: if isSignedIn()
-        && request.resource.data.usuarioId == request.auth.uid;
-      allow update, delete: if isSignedIn()
-        && resource.data.usuarioId == request.auth.uid
-        && request.resource.data.usuarioId == request.auth.uid;
+      allow read: if ownsExisting();
+      allow create: if signedIn() && request.resource.data.usuarioId == request.auth.uid;
+      allow update: if ownsExisting()
+        && request.resource.data.usuarioId == resource.data.usuarioId;
+      allow delete: if ownsExisting();
     }
 
     match /doses/{doseId} {
-      allow read: if isSignedIn()
-        && resource.data.usuarioId == request.auth.uid;
-      allow create: if isSignedIn()
-        && request.resource.data.usuarioId == request.auth.uid;
-      allow update: if isSignedIn()
-        && resource.data.usuarioId == request.auth.uid
-        && request.resource.data.usuarioId == request.auth.uid;
-      allow delete: if isSignedIn()
-        && resource.data.usuarioId == request.auth.uid;
+      allow read: if ownsExisting();
+      allow create: if signedIn() && request.resource.data.usuarioId == request.auth.uid;
+      allow update: if ownsExisting()
+        && request.resource.data.usuarioId == resource.data.usuarioId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'confirmadaEm'
+        ])
+        && request.resource.data.status in [
+          'PENDENTE', 'CONFIRMADA', 'IGNORADA', 'NAO_CONFIRMADA'
+        ];
+      allow delete: if ownsExisting();
+    }
+
+    match /pessoas_confianca/{pessoaId} {
+      allow read, delete: if ownsExisting();
+      allow create: if signedIn()
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'id', 'usuarioId', 'nome', 'email', 'telefone', 'aceitouReceberAvisos'
+        ])
+        && request.resource.data.aceitouReceberAvisos is bool;
+      allow update: if ownsExisting()
+        && request.resource.data.usuarioId == resource.data.usuarioId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'nome', 'email', 'telefone', 'aceitouReceberAvisos'
+        ])
+        && request.resource.data.aceitouReceberAvisos is bool;
+    }
+
+    match /planos/{planoId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /assinaturas/{assinaturaId} {
+      allow read: if ownsExisting();
+      allow write: if false;
+    }
+
+    match /cobrancas/{cobrancaId} {
+      allow read: if ownsExisting();
+      allow write: if false;
+    }
+
+    match /alertas/{alertaId} {
+      allow read: if ownsExisting();
+      allow write: if false;
+    }
+
+    match /eventos_webhook/{eventoId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

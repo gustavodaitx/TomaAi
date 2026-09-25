@@ -55,9 +55,9 @@
 ## 👥 Módulo 4: Pessoa de Confiança & Alertas
 > **Objetivo:** Cuidadores vinculados à conta; alertas se dose não confirmada após tempo limite.
 
-- [ ] **T4.1 — Cadastro de Pessoa de Confiança (`PessoaConfianca`)**
+- [x] **T4.1 — Cadastro de Pessoa de Confiança (`PessoaConfianca`)**
   - *Aceite:* Tela de cadastro/listagem com flag `aceitouReceberAvisos` e atribuição de `responsavelPadraoId` no perfil do usuário (`/usuarios/{uid}`).
-- [ ] **T4.2 — Lógica de Disparo de Alertas por Dose Não Confirmada**
+- [x] **T4.2 — Lógica de Disparo de Alertas por Dose Não Confirmada**
   - *Aceite:* Verificação de estouro de tempo limite após horário programado sem confirmação da dose e gravação do registro na coleção `/alertas`.
 - [ ] **T4.3 — Camada Abstrata para Envio de Notificações (SMS / E-mail / Push)**
   - *Aceite:* Interface Service com implementação stub/mock e Cloud Functions + FCM preparada para notificações ao responsável sem dependência direta de provedores pagos em ambiente dev.
@@ -67,13 +67,13 @@
 ## 💳 Módulo 5: Planos, Assinaturas & Integração Asaas
 > **Objetivo:** Gateway Asaas; controle Free vs Premium/Pago (`asaasCustomerId` no usuário).
 
-- [ ] **T5.1 — Modelagem dos Planos (Quinzenal e Mensal)**
+- [x] **T5.1 — Modelagem dos Planos (Quinzenal e Mensal)**
   - *Aceite:* Coleção `/planos` com registros dos planos `QUINZENAL` (15 dias) e `MENSAL` (ciclo mensal).
-- [ ] **T5.2 — Firebase Cloud Functions para Integração com Asaas API**
+- [x] **T5.2 — Firebase Cloud Functions para Integração com Asaas API**
   - *Aceite:* Cloud Functions em TypeScript/JavaScript para: `criarClienteAsaas`, `criarAssinaturaAsaas` e `consultarCobrancas`.
-- [ ] **T5.3 — Endpoint de Webhook Asaas & Idempotência**
+- [x] **T5.3 — Endpoint de Webhook Asaas & Idempotência**
   - *Aceite:* Function HTTP para receber webhooks do Asaas, validar token, salvar na coleção `/eventos_webhook` com idempotência e atualizar coleções `/assinaturas` e `/cobrancas`.
-- [ ] **T5.4 — Telas Mobile de Seleção de Planos e Gestão da Assinatura/Cobranças**
+- [x] **T5.4 — Telas Mobile de Seleção de Planos e Gestão da Assinatura/Cobranças**
   - *Aceite:* Visualização do plano atual, status da assinatura (`ATIVA`, `INADIMPLENTE`, `CANCELADA`) e telas de pagamento (Pix e Cartão de Crédito em ambiente Sandbox).
 
 ---
@@ -81,13 +81,13 @@
 ## 🛡️ Módulo 6: Testes, UI, Segurança & Documentação
 > **Objetivo:** Validação completa dos fluxos, tratamento de erros, refinamento visual e entrega documentada.
 
-- [ ] **T6.1 — Regras de Segurança do Cloud Firestore (Firestore Rules)**
+- [x] **T6.1 — Regras de Segurança do Cloud Firestore (Firestore Rules)**
   - *Aceite:* Garantir isolamento dos dados por `request.auth.uid`. Bloquear escrita direta no cliente do status de cobranças e assinaturas.
 - [ ] **T6.2 — Testes Unitários e de Integração**
   - *Aceite:* Testes unitários para `ViewModels` e `Repositories` principais + testes das Cloud Functions.
 - [ ] **T6.3 — Refinamento do Material 3, Acessibilidade e UX**
   - *Aceite:* Unificação de estados de carregamento (loading), tratamento visual de erros de rede/rede indisponível e componentes Material 3 otimizados.
-- [ ] **T6.4 — Finalização do README.md e Diagramas Mermaid (DER e Arquitetura)**
+- [x] **T6.4 — Finalização do README.md e Diagramas Mermaid (DER e Arquitetura)**
   - *Aceite:* Documentação com instruções para execução, diagramas arquiteturais e guia para configuração do Sandbox Asaas.
 
 ---

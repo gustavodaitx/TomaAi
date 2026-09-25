@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "doses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "dataAgenda", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "assinaturas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ciclo", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "proximaCobranca", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

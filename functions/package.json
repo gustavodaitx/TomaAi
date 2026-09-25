@@ -3,6 +3,7 @@
   "scripts": {
     "lint": "tsc --noEmit",
     "build": "tsc",
+    "test": "npm run build && node --test tests/*.test.cjs",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",

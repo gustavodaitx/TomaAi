@@ -1,5 +1,6 @@
 import axios from "axios";
 import * as admin from "firebase-admin";
+import { dataLocalSaoPaulo } from "../utils/data";
 
 export async function criarAssinaturaNoAsaas(
   customerId: string,
@@ -16,15 +17,17 @@ export async function criarAssinaturaNoAsaas(
     throw new Error("ASAAS_API_KEY não configurada no ambiente do backend.");
   }
 
-  // Mapeamento do ciclo conforme a documentação oficial da API Asaas
-  // QUINZENAL -> BIWEEKLY (a cada 15 dias / 2 semanas)
-  // MENSAL -> MONTHLY
-  const cycleMapped = ciclo.toUpperCase() === "QUINZENAL" ? "BIWEEKLY" : "MONTHLY";
+  if (ciclo.toUpperCase() === "QUINZENAL") {
+    return criarAssinaturaQuinzenalNoAsaas(customerId, usuarioId, planoId, valor, billingType, asaasUrl, apiKey);
+  }
+
+  if (ciclo.toUpperCase() !== "MENSAL") {
+    throw new Error("Ciclo de assinatura Asaas inválido.");
+  }
+  const cycleMapped = "MONTHLY";
 
   // Data de vencimento da primeira cobrança (amanhã)
-  const amanha = new Date();
-  amanha.setDate(amanha.getDate() + 1);
-  const nextDueDate = amanha.toISOString().split("T")[0];
+  const nextDueDate = dataLocalSaoPaulo(1);
 
   try {
     const response = await axios.post(
@@ -72,6 +75,48 @@ export async function criarAssinaturaNoAsaas(
       error?.response?.data?.errors?.[0]?.description ||
         "Falha ao criar assinatura no gateway Asaas."
     );
+  }
+}
+
+async function criarAssinaturaQuinzenalNoAsaas(
+  customerId: string,
+  usuarioId: string,
+  planoId: string,
+  valor: number,
+  billingType: string,
+  asaasUrl: string,
+  apiKey: string
+): Promise<{ subscriptionId: string; status: string }> {
+  const db = admin.firestore();
+  const docRef = db.collection("assinaturas").doc();
+  const dueDate = dataLocalSaoPaulo(1);
+  try {
+    const response = await axios.post(`${asaasUrl}/payments`, {
+      customer: customerId,
+      billingType,
+      value: valor,
+      dueDate,
+      description: `TomaAí - Plano quinzenal`,
+      externalReference: docRef.id,
+    }, { headers: { access_token: apiKey, "Content-Type": "application/json" } });
+    await docRef.set({
+      id: docRef.id,
+      usuarioId,
+      planoId,
+      asaasSubscriptionId: null,
+      asaasPaymentId: response.data.id,
+      asaasCustomerId: customerId,
+      ciclo: "QUINZENAL",
+      valor,
+      formaPagamento: billingType,
+      status: "PENDENTE",
+      proximaCobranca: new Date(`${dueDate}T00:00:00-03:00`).getTime(),
+      criadoEm: Date.now(),
+    });
+    return { subscriptionId: docRef.id, status: "PENDENTE" };
+  } catch (error: any) {
+    console.error("Erro ao criar a primeira cobrança quinzenal no Asaas:", error?.response?.data || error.message);
+    throw new Error(error?.response?.data?.errors?.[0]?.description || "Falha ao criar cobrança quinzenal no Asaas.");
   }
 }
 

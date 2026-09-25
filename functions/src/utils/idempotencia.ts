@@ -1,41 +1,44 @@
 import * as admin from "firebase-admin";
+import { createHash } from "crypto";
 
 export async function verificarERegistrarEvento(
   tipoEvento: string,
   resourceId: string,
   assinaturaId?: string,
-  cobrancaId?: string
-): Promise<{ duplicado: Boolean; eventoId: string }> {
+  cobrancaId?: string,
+  identificadorEvento?: string
+): Promise<{ duplicado: boolean; eventoId: string }> {
   const db = admin.firestore();
   const collection = db.collection("eventos_webhook");
-
-  // Consulta por evento e recurso no Asaas
-  const snapshot = await collection
-    .where("tipoEvento", "==", tipoEvento)
-    .where("asaasResourceId", "==", resourceId)
-    .get();
-
-  if (!snapshot.empty) {
-    const docExistente = snapshot.docs[0];
-    return { duplicado: true, eventoId: docExistente.id };
-  }
-
-  // Registra novo evento com status RECEBIDO
-  const docRef = collection.doc();
+  const identity = identificadorEvento || `${tipoEvento}:${resourceId}`;
+  const eventoId = createHash("sha256").update(identity).digest("hex");
+  const docRef = collection.doc(eventoId);
   const agora = Date.now();
+  return db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(docRef);
+    if (existing.exists && existing.get("statusProcessamento") === "PROCESSADO") {
+      return { duplicado: true, eventoId: docRef.id };
+    }
+    const inicioAnterior = existing.get("processamentoIniciadoEm") as number | undefined;
+    const processamentoAtivo = existing.get("statusProcessamento") === "PROCESSANDO"
+      && inicioAnterior !== undefined && agora - inicioAnterior < 5 * 60 * 1000;
+    if (processamentoAtivo) return { duplicado: true, eventoId: docRef.id };
 
-  await docRef.set({
-    id: docRef.id,
-    tipoEvento: tipoEvento,
-    asaasResourceId: resourceId,
-    assinaturaId: assinaturaId || null,
-    cobrancaId: cobrancaId || null,
-    statusProcessamento: "RECEBIDO",
-    recebidoEm: agora,
-    processadoEm: null,
+    const dadosEvento = {
+      id: docRef.id,
+      tipoEvento,
+      asaasResourceId: resourceId,
+      assinaturaId: assinaturaId || null,
+      cobrancaId: cobrancaId || null,
+      statusProcessamento: "PROCESSANDO",
+      processamentoIniciadoEm: agora,
+      recebidoEm: agora,
+      processadoEm: null,
+    };
+    if (existing.exists) transaction.set(docRef, dadosEvento);
+    else transaction.create(docRef, dadosEvento);
+    return { duplicado: false, eventoId: docRef.id };
   });
-
-  return { duplicado: false, eventoId: docRef.id };
 }
 
 export async function marcarEventoProcessado(

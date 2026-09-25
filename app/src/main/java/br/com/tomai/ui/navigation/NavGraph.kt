@@ -16,9 +16,13 @@ import br.com.tomai.ui.login.RecuperarSenhaScreen
 import br.com.tomai.ui.doses.DosesDiaScreen
 import br.com.tomai.ui.medicamentos.MedicamentoFormScreen
 import br.com.tomai.ui.medicamentos.MedicamentosListScreen
+import br.com.tomai.ui.responsaveis.PessoasConfiancaScreen
+import br.com.tomai.ui.assinaturas.AssinaturasScreen
 import br.com.tomai.viewmodel.AuthViewModel
 import br.com.tomai.viewmodel.DoseViewModel
 import br.com.tomai.viewmodel.MedicamentoViewModel
+import br.com.tomai.viewmodel.PessoaConfiancaViewModel
+import br.com.tomai.viewmodel.AssinaturaViewModel
 import br.com.tomai.viewmodel.ScreenMedicamentoId
 
 @Composable
@@ -82,6 +86,10 @@ fun AppNavGraph(
                 onNavegarDosesDia = {
                     navController.navigate(Screen.DosesDia.rota)
                 },
+                onNavegarPessoasConfianca = {
+                    navController.navigate(Screen.PessoasConfianca.rota)
+                },
+                onNavegarAssinaturas = { navController.navigate(Screen.Assinaturas.rota) },
                 onLogoutConcluido = {
                     navController.navigate(Screen.Login.rota) {
                         popUpTo(Screen.Home.rota) { inclusive = true }
@@ -96,6 +104,26 @@ fun AppNavGraph(
             DosesDiaScreen(
                 usuarioId = uid,
                 viewModel = doseViewModel,
+                onVoltar = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.PessoasConfianca.rota) {
+            val responsavelViewModel: PessoaConfiancaViewModel = viewModel()
+            val usuario = uiState.usuario
+            PessoasConfiancaScreen(
+                usuarioId = viewModel.obterUidAutenticado().orEmpty(),
+                responsavelPadraoId = usuario?.responsavelPadraoId,
+                viewModel = responsavelViewModel,
+                onVoltar = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Assinaturas.rota) {
+            val assinaturaViewModel: AssinaturaViewModel = viewModel()
+            AssinaturasScreen(
+                usuarioId = viewModel.obterUidAutenticado().orEmpty(),
+                viewModel = assinaturaViewModel,
                 onVoltar = { navController.popBackStack() }
             )
         }

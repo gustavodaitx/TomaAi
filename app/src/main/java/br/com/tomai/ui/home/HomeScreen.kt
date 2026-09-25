@@ -49,6 +49,8 @@ fun HomeScreen(
     viewModel: AuthViewModel,
     onNavegarMedicamentos: () -> Unit = {},
     onNavegarDosesDia: () -> Unit = {},
+    onNavegarPessoasConfianca: () -> Unit = {},
+    onNavegarAssinaturas: () -> Unit = {},
     onLogoutConcluido: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -183,6 +185,34 @@ fun HomeScreen(
                             )
                         }
                     }
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text("Planos e assinatura", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Consulte planos, cobranças e gerencie sua assinatura pelo ambiente Sandbox.", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(12.dp))
+                    AppButton(text = "Ver planos e pagamentos", onClick = onNavegarAssinaturas)
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text("Pessoas de confiança", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Cadastre um responsável e escolha se ele autorizou receber avisos sobre doses.", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(12.dp))
+                    AppButton(text = "Gerenciar responsáveis", onClick = onNavegarPessoasConfianca)
                 }
             }
 

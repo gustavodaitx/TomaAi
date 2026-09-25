@@ -14,4 +14,8 @@ captures/
 .externalNativeBuild
 .cxx
 node_modules/
+/functions/lib/
+/functions/.env
+/functions/.env.*
+!/functions/.env.example
 npm-debug.log
