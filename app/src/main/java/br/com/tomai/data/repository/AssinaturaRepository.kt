@@ -1,5 +1,6 @@
 package br.com.tomai.data.repository
 
+import android.util.Log
 import br.com.tomai.model.Plano
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
@@ -13,12 +14,13 @@ class AssinaturaRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
     suspend fun listarPlanos(): List<Plano> {
-        val result = functions.getHttpsCallable("listarPlanos").call().await()
-        val rows = result.getData() as? List<*> ?: return emptyList()
-        return rows.filterIsInstance<Map<*, *>>().mapNotNull { row ->
-            val data = row.entries.filter { it.key is String }.associate { it.key as String to it.value }
-            val id = data["id"] as? String ?: return@mapNotNull null
-            Plano.fromMap(id, data)
+        val snapshot = firestore.collection("planos").get().await()
+        return snapshot.documents.mapNotNull { document ->
+            runCatching {
+                Plano.fromMap(document.id, document.data.orEmpty())
+            }.onFailure { erro ->
+                Log.w("AssinaturaRepository", "Plano ${document.id} ignorado: ${erro.localizedMessage}")
+            }.getOrNull()
         }
     }
 

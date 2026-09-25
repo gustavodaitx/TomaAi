@@ -66,9 +66,11 @@ class DoseRepositoryImpl(
             .whereLessThanOrEqualTo("dataAgenda", dataFim)
             .get()
             .await()
-        return snapshot.documents.mapNotNull { document ->
+        val doses = snapshot.documents.mapNotNull { document ->
             runCatching { Dose.fromFirestoreMap(document.id, document.data ?: emptyMap()) }.getOrNull()
-        }.sortedWith(compareByDescending<Dose> { it.dataAgenda }.thenByDescending { it.horarioProgramado })
+        }
+        // A query permanece sem orderBy; o histórico é ordenado em memória por data e hora.
+        return doses.sortedByDescending { "${it.dataAgenda}T${it.horarioProgramado}" }
     }
 
     override suspend fun garantirAgendaDiaria(
