@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import { criarClienteNoAsaas } from "./asaas/clientes";
-import { cancelarAssinaturaNoAsaas, criarAssinaturaNoAsaas } from "./asaas/assinaturas";
+import { cancelarAssinaturaNoAsaas, criarAssinaturaNoAsaas, DadosCartaoAsaas } from "./asaas/assinaturas";
 import { obterPixDaCobranca, removerCobrancaPendente, sincronizarCobrancasNoAsaas } from "./asaas/cobrancas";
 import { processarAsaasWebhook } from "./webhooks/asaasWebhook";
 import { verificarDosesNaoConfirmadas } from "./alerts/verificarDosesNaoConfirmadas";
@@ -72,6 +72,25 @@ export const criarAssinaturaAsaas = functions.https.onCall(async (data, context)
   const userSnapshot = await userRef.get();
   const user = userSnapshot.data();
   if (!user) throw new functions.https.HttpsError("failed-precondition", "Perfil não encontrado.");
+  let dadosCartao: DadosCartaoAsaas | undefined;
+  if (formaPagamento === "CREDIT_CARD") {
+    const card = data?.dadosCartao;
+    const digits = (value: unknown) => String(value || "").replace(/\D/g, "");
+    if (!card || String(card.nomeTitular || "").trim().length < 2 || digits(card.numero).length < 13 || digits(card.numero).length > 19 ||
+      digits(card.cvv).length < 3 || digits(card.cvv).length > 4 || digits(card.cpf).length !== 11 || digits(card.cep).length !== 8 ||
+      !String(card.numeroEndereco || "").trim() || ![10, 11].includes(digits(card.telefone).length)) {
+      throw new functions.https.HttpsError("invalid-argument", "Confira os dados do cartão e do titular.");
+    }
+    dadosCartao = {
+      nomeTitular: String(card.nomeTitular).trim(), numero: digits(card.numero), validadeMes: digits(card.validadeMes),
+      validadeAno: digits(card.validadeAno), cvv: digits(card.cvv), cpf: digits(card.cpf), cep: digits(card.cep),
+      numeroEndereco: String(card.numeroEndereco).trim(), telefone: digits(card.telefone),
+      email: String(context.auth?.token.email || ""), remoteIp: context.rawRequest.ip || "",
+    };
+    if (!/^\d{2}$/.test(dadosCartao.validadeMes) || !/^\d{4}$/.test(dadosCartao.validadeAno) || !dadosCartao.email || !dadosCartao.remoteIp) {
+      throw new functions.https.HttpsError("invalid-argument", "Vencimento, e-mail ou conexão inválida para processar o cartão.");
+    }
+  }
   let customerId = user.asaasCustomerId as string | undefined;
   if (!customerId) {
     const email = context.auth?.token.email as string | undefined;
@@ -79,8 +98,17 @@ export const criarAssinaturaAsaas = functions.https.onCall(async (data, context)
     customerId = await criarClienteNoAsaas(user.nome, email);
     await userRef.update({ asaasCustomerId: customerId });
   }
-  const resultado = await criarAssinaturaNoAsaas(customerId, uid, planoId, plano.ciclo, plano.valor, formaPagamento);
-  return { sucesso: true, ...resultado };
+  const resultado = await criarAssinaturaNoAsaas(customerId, uid, planoId, plano.ciclo, plano.valor, formaPagamento, dadosCartao);
+  if (formaPagamento !== "PIX") return { sucesso: true, ...resultado };
+  try {
+    const pagamentos = await sincronizarCobrancasNoAsaas(resultado.subscriptionId, uid) as Array<{ id?: string; billingType?: string }>;
+    const pagamentoPix = pagamentos.find((pagamento) => pagamento.billingType === "PIX" && pagamento.id);
+    if (pagamentoPix?.id) return { sucesso: true, ...resultado, pix: await obterPixDaCobranca(pagamentoPix.id) };
+    return { sucesso: true, ...resultado, pixErro: "A cobrança foi criada, mas o QR Pix ainda não está disponível. Atualize as cobranças em instantes." };
+  } catch (error) {
+    console.error("Assinatura Pix criada, QR ainda indisponível:", error);
+    return { sucesso: true, ...resultado, pixErro: "A cobrança foi criada, mas não foi possível carregar o QR Pix agora. Atualize as cobranças em instantes." };
+  }
 });
 
 export const consultarCobrancas = functions.https.onCall(async (data, context) => {

@@ -6,7 +6,7 @@ export async function sincronizarCobrancasNoAsaas(
   assinaturaId: string,
   usuarioId: string
 ): Promise<unknown[]> {
-  const asaasUrl = process.env.ASAAS_URL || "https://sandbox.asaas.com/api/v3";
+  const asaasUrl = process.env.ASAAS_URL || "https://api-sandbox.asaas.com/v3";
   const apiKey = process.env.ASAAS_API_KEY || "";
 
   try {
@@ -62,7 +62,7 @@ export async function sincronizarCobrancasNoAsaas(
 }
 
 export async function obterPixDaCobranca(asaasPaymentId: string): Promise<{ encodedImage: string; payload: string; expirationDate: string }> {
-  const asaasUrl = process.env.ASAAS_URL || "https://sandbox.asaas.com/api/v3";
+  const asaasUrl = process.env.ASAAS_URL || "https://api-sandbox.asaas.com/v3";
   const apiKey = process.env.ASAAS_API_KEY || "";
   if (!apiKey) throw new Error("ASAAS_API_KEY não configurada no ambiente do backend.");
   const response = await axios.get(
@@ -73,7 +73,7 @@ export async function obterPixDaCobranca(asaasPaymentId: string): Promise<{ enco
 }
 
 export async function removerCobrancaPendente(asaasPaymentId: string): Promise<void> {
-  const asaasUrl = process.env.ASAAS_URL || "https://sandbox.asaas.com/api/v3";
+  const asaasUrl = process.env.ASAAS_URL || "https://api-sandbox.asaas.com/v3";
   const apiKey = process.env.ASAAS_API_KEY || "";
   if (!apiKey) throw new Error("ASAAS_API_KEY não configurada no ambiente do backend.");
   const url = `${asaasUrl}/payments/${encodeURIComponent(asaasPaymentId)}`;
@@ -86,9 +86,11 @@ export async function criarProximaCobrancaQuinzenal(
   assinaturaId: string,
   customerId: string,
   valor: number,
-  billingType: string
+  billingType: string,
+  creditCardToken?: string,
+  remoteIp?: string
 ): Promise<{ id: string; dueDate: string }> {
-  const asaasUrl = process.env.ASAAS_URL || "https://sandbox.asaas.com/api/v3";
+  const asaasUrl = process.env.ASAAS_URL || "https://api-sandbox.asaas.com/v3";
   const apiKey = process.env.ASAAS_API_KEY || "";
   if (!apiKey) throw new Error("ASAAS_API_KEY não configurada no ambiente do backend.");
   const headers = { access_token: apiKey, "Content-Type": "application/json" };
@@ -108,6 +110,7 @@ export async function criarProximaCobrancaQuinzenal(
     dueDate,
     description: "TomaAí - Plano quinzenal",
     externalReference: assinaturaId,
+    ...(billingType === "CREDIT_CARD" && creditCardToken ? { creditCardToken, remoteIp } : {}),
   }, { headers });
   return { id: created.data.id, dueDate };
 }

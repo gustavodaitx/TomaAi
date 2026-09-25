@@ -9,8 +9,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
+data class DadosCartaoContratacao(
+    val nomeTitular: String,
+    val numero: String,
+    val validadeMes: String,
+    val validadeAno: String,
+    val cvv: String,
+    val cpf: String,
+    val cep: String,
+    val numeroEndereco: String,
+    val telefone: String
+)
+
 class AssinaturaRepository(
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance(),
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("us-central1"),
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
     suspend fun listarPlanos(): List<Plano> {
@@ -24,9 +36,28 @@ class AssinaturaRepository(
         }
     }
 
-    suspend fun criarAssinatura(planoId: String, formaPagamento: String) = functions
-        .getHttpsCallable("criarAssinaturaAsaas")
-        .call(mapOf("planoId" to planoId, "formaPagamento" to formaPagamento)).await()
+    suspend fun criarAssinatura(
+        planoId: String,
+        formaPagamento: String,
+        cartao: DadosCartaoContratacao? = null
+    ) = functions.getHttpsCallable("criarAssinaturaAsaas")
+        .call(buildMap {
+            put("planoId", planoId)
+            put("formaPagamento", formaPagamento)
+            cartao?.let {
+                put("dadosCartao", mapOf(
+                    "nomeTitular" to it.nomeTitular,
+                    "numero" to it.numero,
+                    "validadeMes" to it.validadeMes,
+                    "validadeAno" to it.validadeAno,
+                    "cvv" to it.cvv,
+                    "cpf" to it.cpf,
+                    "cep" to it.cep,
+                    "numeroEndereco" to it.numeroEndereco,
+                    "telefone" to it.telefone
+                ))
+            }
+        }).await()
 
     suspend fun consultarCobrancas(assinaturaId: String) = functions
         .getHttpsCallable("consultarCobrancas")
@@ -36,11 +67,13 @@ class AssinaturaRepository(
         .getHttpsCallable("cancelarAssinaturaAsaas")
         .call(mapOf("assinaturaId" to assinaturaId)).await()
 
-    suspend fun obterPix(cobrancaId: String): String {
+    suspend fun obterPix(cobrancaId: String): Pair<String, String?> {
         val result = functions.getHttpsCallable("obterPixCobranca")
             .call(mapOf("cobrancaId" to cobrancaId)).await()
-        return (result.getData() as? Map<*, *>)?.get("payload") as? String
+        val data = result.getData() as? Map<*, *>
+        val payload = data?.get("payload") as? String
             ?: throw IllegalStateException("Código Pix não disponível para esta cobrança.")
+        return payload to (data["encodedImage"] as? String)
     }
 
     fun observarAssinaturas(usuarioId: String): Flow<List<Map<String, Any?>>> = callbackFlow {

@@ -24,11 +24,19 @@ export const gerarCobrancasQuinzenais = functions.pubsub
       });
       if (!assinatura) continue;
       try {
+        const metodoPagamento = assinatura.formaPagamento === "CREDIT_CARD"
+          ? (await db.collection("asaas_metodos_pagamento").doc(assinaturaDoc.id).get()).data()
+          : undefined;
+        if (assinatura.formaPagamento === "CREDIT_CARD" && !metodoPagamento?.creditCardToken) {
+          throw new Error("Token do cartão não encontrado para a cobrança quinzenal.");
+        }
         const cobranca = await criarProximaCobrancaQuinzenal(
           assinaturaDoc.id,
           assinatura.asaasCustomerId,
           assinatura.valor,
-          assinatura.formaPagamento || "PIX"
+          assinatura.formaPagamento || "PIX",
+          metodoPagamento?.creditCardToken,
+          metodoPagamento?.remoteIp
         );
         const dueDateMillis = new Date(`${cobranca.dueDate}T00:00:00-03:00`).getTime();
         const atualizado = await db.runTransaction(async (transaction) => {

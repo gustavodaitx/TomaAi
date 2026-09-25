@@ -5,7 +5,7 @@ export async function criarClienteNoAsaas(
   email: string,
   cpfCnpj?: string
 ): Promise<string> {
-  const asaasUrl = process.env.ASAAS_URL || "https://sandbox.asaas.com/api/v3";
+  const asaasUrl = process.env.ASAAS_URL || "https://api-sandbox.asaas.com/v3";
   const apiKey = process.env.ASAAS_API_KEY || "";
 
   if (!apiKey) {
