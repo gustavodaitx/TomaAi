@@ -62,14 +62,12 @@ class DoseRepositoryImpl(
         require(usuarioId.isNotBlank()) { "Usuário não identificado." }
         val snapshot = firestore.collection(COLECAO_DOSES)
             .whereEqualTo("usuarioId", usuarioId)
-            .whereGreaterThanOrEqualTo("dataAgenda", dataInicio)
-            .whereLessThanOrEqualTo("dataAgenda", dataFim)
             .get()
             .await()
         val doses = snapshot.documents.mapNotNull { document ->
             runCatching { Dose.fromFirestoreMap(document.id, document.data ?: emptyMap()) }.getOrNull()
-        }
-        // A query permanece sem orderBy; o histórico é ordenado em memória por data e hora.
+        }.filter { dose -> dose.dataAgenda >= dataInicio && dose.dataAgenda <= dataFim }
+        // Filtragem do período e ordenação ficam em memória para dispensar índice composto.
         return doses.sortedByDescending { "${it.dataAgenda}T${it.horarioProgramado}" }
     }
 
