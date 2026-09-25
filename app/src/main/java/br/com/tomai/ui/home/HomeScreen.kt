@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -41,19 +44,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.com.tomai.ui.components.AppButton
+import br.com.tomai.ui.components.DoseCard
 import br.com.tomai.viewmodel.AuthViewModel
+import br.com.tomai.viewmodel.DoseViewModel
+import br.com.tomai.viewmodel.AssinaturaViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: AuthViewModel,
+    doseViewModel: DoseViewModel,
+    assinaturaViewModel: AssinaturaViewModel,
     onNavegarMedicamentos: () -> Unit = {},
     onNavegarDosesDia: () -> Unit = {},
+    onNavegarHistorico: () -> Unit = {},
     onNavegarPessoasConfianca: () -> Unit = {},
     onNavegarAssinaturas: () -> Unit = {},
     onLogoutConcluido: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val doseState by doseViewModel.uiState.collectAsState()
+    val assinaturaState by assinaturaViewModel.uiState.collectAsState()
     val usuario = uiState.usuario
     val uidExibicao = uiState.firestoreUid
         ?: usuario?.id?.takeIf { it.isNotBlank() }
@@ -71,6 +82,13 @@ fun HomeScreen(
         val uid = usuario?.id
         if (!uid.isNullOrBlank() && uiState.firestoreUid.isNullOrBlank()) {
             viewModel.observarUsuarioFirestore(uid)
+        }
+    }
+
+    LaunchedEffect(uidExibicao) {
+        if (uidExibicao != "N/D") {
+            doseViewModel.iniciar(uidExibicao)
+            assinaturaViewModel.carregar(uidExibicao)
         }
     }
 
@@ -121,6 +139,24 @@ fun HomeScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            val assinaturaAtual = assinaturaState.assinaturas.firstOrNull {
+                it["status"]?.toString()?.uppercase() in setOf("ACTIVE", "ATIVA")
+            } ?: assinaturaState.assinaturas.firstOrNull()
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Minha assinatura", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimary)
+                    Text(assinaturaAtual?.get("planoId")?.toString()?.let { "Plano $it" } ?: "Nenhum plano ativo",
+                        style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                    Text(assinaturaAtual?.get("status")?.toString()?.replace('_', ' ') ?: "Consulte os planos disponíveis",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .88f))
+                    AppButton("Ver assinatura", onClick = onNavegarAssinaturas,
+                        containerColor = MaterialTheme.colorScheme.onPrimary, contentColor = MaterialTheme.colorScheme.primary)
+                }
+            }
             // Card de Perfil do Usuário
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -185,6 +221,21 @@ fun HomeScreen(
                             )
                         }
                     }
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text("Histórico de doses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Consulte doses anteriores por dia, semana ou mês.", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    AppButton(text = "Abrir histórico", onClick = onNavegarHistorico)
                 }
             }
 
@@ -313,6 +364,37 @@ fun HomeScreen(
                         text = "Abrir checklist de hoje",
                         onClick = onNavegarDosesDia
                     )
+                    if (doseState.isLoading && doseState.doses.isEmpty()) {
+                        androidx.compose.material3.CircularProgressIndicator(Modifier.padding(top = 12.dp))
+                    } else if (doseState.doses.isNotEmpty()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp).padding(top = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(doseState.doses, key = { it.id }) { dose ->
+                                DoseCard(
+                                    nome = dose.medicamentoNome,
+                                    dosagem = dose.dosagem,
+                                    horario = dose.horarioProgramado,
+                                    status = when (dose.status) {
+                                        br.com.tomai.model.Dose.STATUS_CONFIRMADA -> "CONFIRMADA"
+                                        br.com.tomai.model.Dose.STATUS_NAO_CONFIRMADA -> "NÃO CONFIRMADA"
+                                        br.com.tomai.model.Dose.STATUS_IGNORADA -> "IGNORADA"
+                                        else -> "PENDENTE"
+                                    },
+                                    onConfirmarClick = { doseViewModel.marcarTomado(dose.id, dose.medicamentoId) },
+                                    podeConfirmar = dose.status == br.com.tomai.model.Dose.STATUS_PENDENTE &&
+                                        doseState.doseEmAtualizacao != dose.id
+                                )
+                            }
+                        }
+                    } else {
+                        Text("Nenhuma dose cadastrada para hoje.", modifier = Modifier.padding(top = 12.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    androidx.compose.material3.TextButton(onClick = onNavegarHistorico) {
+                        Text("Ver histórico de doses")
+                    }
                 }
             }
 

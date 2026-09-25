@@ -14,6 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 
 @Composable
 fun AppButton(
@@ -43,7 +46,9 @@ fun AppButton(
             CircularProgressIndicator(
                 color = contentColor,
                 strokeWidth = 2.5.dp,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp).semantics {
+                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                }
             )
         } else {
             Text(

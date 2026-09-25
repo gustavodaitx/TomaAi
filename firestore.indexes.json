@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "doses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioId", "order": "ASCENDING" },
+        { "fieldPath": "dataAgenda", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "assinaturas",
       "queryScope": "COLLECTION",
       "fields": [

@@ -25,6 +25,17 @@ class DoseViewModel(
     private val _uiState = MutableStateFlow(DoseUiState())
     val uiState: StateFlow<DoseUiState> = _uiState.asStateFlow()
 
+    fun carregarHistorico(usuarioId: String, dataInicio: String, dataFim: String) {
+        _uiState.update { it.copy(carregandoHistorico = true, erroHistorico = null) }
+        viewModelScope.launch {
+            runCatching { doseRepository.buscarHistorico(usuarioId, dataInicio, dataFim) }
+                .onSuccess { doses -> _uiState.update { it.copy(historico = doses, carregandoHistorico = false) } }
+                .onFailure { erro -> _uiState.update {
+                    it.copy(carregandoHistorico = false, erroHistorico = erro.localizedMessage ?: "Não foi possível carregar o histórico.")
+                } }
+        }
+    }
+
     fun iniciar(usuarioId: String) {
         if (usuarioId.isBlank()) return
         val dataHoje = Dose.dataHoje()

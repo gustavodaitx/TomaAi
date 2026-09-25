@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -50,6 +52,7 @@ import br.com.tomai.model.Dose
 import br.com.tomai.notifications.DoseNotificationHelper
 import br.com.tomai.notifications.DoseReminderScheduler
 import br.com.tomai.viewmodel.DoseViewModel
+import br.com.tomai.ui.components.DoseCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -217,63 +220,13 @@ private fun DoseChecklistCard(
         else -> if (atrasada) "Atrasado (pendente)" else "Pendente"
     }
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = when (dose.status) {
-                Dose.STATUS_CONFIRMADA -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                Dose.STATUS_IGNORADA -> MaterialTheme.colorScheme.surfaceVariant
-                Dose.STATUS_NAO_CONFIRMADA -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
-                else -> if (atrasada) {
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                }
-            }
-        ),
-        modifier = Modifier.fillMaxWidth()
+    DoseCard(
+        nome = dose.medicamentoNome,
+        dosagem = dose.dosagem,
+        horario = dose.horarioProgramado,
+        status = statusLabel
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = dose.medicamentoNome,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = dose.dosagem,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Schedule,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    Text(
-                        text = dose.horarioProgramado,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            Text(
-                text = "Status: $statusLabel",
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-
-            if (dose.status == Dose.STATUS_PENDENTE) {
+        if (dose.status == Dose.STATUS_PENDENTE) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -307,7 +260,6 @@ private fun DoseChecklistCard(
                     Icon(Icons.Default.Warning, contentDescription = null)
                     Text("Marcar atrasado / não confirmado", modifier = Modifier.padding(start = 4.dp))
                 }
-            }
         }
     }
 }

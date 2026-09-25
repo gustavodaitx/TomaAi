@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import br.com.tomai.viewmodel.AssinaturaViewModel
+import br.com.tomai.ui.components.StatusChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +72,8 @@ fun AssinaturasScreen(usuarioId: String, viewModel: AssinaturaViewModel, onVolta
                 val id = assinatura["documentId"]?.toString().orEmpty()
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Plano ${assinatura["planoId"] ?: ""} • ${assinatura["status"] ?: "PENDENTE"}")
+                        Text("Plano ${assinatura["planoId"] ?: ""}", style = MaterialTheme.typography.titleMedium)
+                        StatusChip(assinatura["status"]?.toString() ?: "PENDENTE")
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { viewModel.atualizarCobrancas(id) }) { Text("Atualizar cobranças") }
                             OutlinedButton(onClick = { viewModel.cancelar(id) }, enabled = assinatura["status"] != "CANCELADA") { Text("Cancelar") }
@@ -94,7 +96,10 @@ fun AssinaturasScreen(usuarioId: String, viewModel: AssinaturaViewModel, onVolta
             items(state.cobrancas, key = { it["asaasPaymentId"]?.toString() ?: it.hashCode().toString() }) { cobranca ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("${cobranca["status"] ?: "PENDENTE"} • ${cobranca["formaPagamento"] ?: ""}")
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatusChip(cobranca["status"]?.toString() ?: "PENDENTE")
+                            Text(cobranca["formaPagamento"]?.toString().orEmpty(), style = MaterialTheme.typography.bodyMedium)
+                        }
                         Text("Vencimento: ${cobranca["vencimento"] ?: "—"}")
                         if (cobranca["formaPagamento"] == "PIX") {
                             OutlinedButton(onClick = { viewModel.obterPix(cobranca["documentId"].toString()) }) { Text("Exibir Pix copia e cola") }

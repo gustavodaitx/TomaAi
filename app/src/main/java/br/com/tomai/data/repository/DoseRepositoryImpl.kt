@@ -56,6 +56,19 @@ class DoseRepositoryImpl(
             awaitClose { registration.remove() }
         }
 
+    override suspend fun buscarHistorico(usuarioId: String, dataInicio: String, dataFim: String): List<Dose> {
+        require(usuarioId.isNotBlank()) { "Usuário não identificado." }
+        val snapshot = firestore.collection(COLECAO_DOSES)
+            .whereEqualTo("usuarioId", usuarioId)
+            .whereGreaterThanOrEqualTo("dataAgenda", dataInicio)
+            .whereLessThanOrEqualTo("dataAgenda", dataFim)
+            .get()
+            .await()
+        return snapshot.documents.mapNotNull { document ->
+            runCatching { Dose.fromFirestoreMap(document.id, document.data ?: emptyMap()) }.getOrNull()
+        }.sortedWith(compareBy<Dose> { it.dataAgenda }.thenBy { it.horarioProgramado })
+    }
+
     override suspend fun garantirAgendaDiaria(
         usuarioId: String,
         medicamentos: List<Medicamento>,

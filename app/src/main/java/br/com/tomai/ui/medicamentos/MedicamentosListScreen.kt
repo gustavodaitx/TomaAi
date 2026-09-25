@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,6 +31,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -58,6 +61,7 @@ fun MedicamentosListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var medicamentoParaRemover by remember { mutableStateOf<Medicamento?>(null) }
+    var busca by remember { mutableStateOf("") }
 
     LaunchedEffect(usuarioId) {
         viewModel.iniciarObservacao(usuarioId)
@@ -167,7 +171,32 @@ fun MedicamentosListScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(uiState.medicamentos, key = { it.id }) { medicamento ->
+                    item {
+                        OutlinedTextField(
+                            value = busca,
+                            onValueChange = { busca = it },
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                            placeholder = { Text("Buscar medicamento") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        )
+                    }
+                    val medicamentosFiltrados = uiState.medicamentos.filter {
+                        it.nome.contains(busca.trim(), ignoreCase = true)
+                    }
+                    if (medicamentosFiltrados.isEmpty()) {
+                        item {
+                            Text("Nenhum resultado para ‘$busca’", style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp))
+                        }
+                    }
+                    items(medicamentosFiltrados, key = { it.id }) { medicamento ->
                         MedicamentoCard(
                             medicamento = medicamento,
                             onEditar = { onEditar(medicamento.id) },

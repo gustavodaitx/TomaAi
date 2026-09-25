@@ -9,6 +9,7 @@ sealed class Screen(val rota: String) {
     data object RecuperarSenha : Screen("recuperar_senha")
     data object Home : Screen("home")
     data object DosesDia : Screen("doses_dia")
+    data object HistoricoDoses : Screen("historico_doses")
     data object Medicamentos : Screen("medicamentos")
     data object PessoasConfianca : Screen("pessoas_confianca")
     data object Assinaturas : Screen("assinaturas")

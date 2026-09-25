@@ -8,6 +8,8 @@ interface DoseRepository {
 
     fun observarDosesDoDia(usuarioId: String, dataAgenda: String): Flow<List<Dose>>
 
+    suspend fun buscarHistorico(usuarioId: String, dataInicio: String, dataFim: String): List<Dose>
+
     suspend fun garantirAgendaDiaria(
         usuarioId: String,
         medicamentos: List<Medicamento>,

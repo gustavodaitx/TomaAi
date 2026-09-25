@@ -101,7 +101,7 @@ fun LoginScreen(
             // Logotipo e Cabeçalho
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(64.dp)
                     .background(
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = CircleShape
@@ -112,7 +112,7 @@ fun LoginScreen(
                     imageVector = Icons.Default.Medication,
                     contentDescription = "Ícone TomaAí",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(36.dp)
                 )
             }
 
@@ -130,9 +130,18 @@ fun LoginScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
             )
 
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text("Bem-vindo!", style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
             // Mensagem de Erro Inline se houver
             if (uiState.erro != null) {
                 Card(
@@ -279,6 +288,8 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
+            }
+                }
             }
         }
     }

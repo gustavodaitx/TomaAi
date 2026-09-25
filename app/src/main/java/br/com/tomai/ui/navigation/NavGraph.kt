@@ -14,6 +14,7 @@ import br.com.tomai.ui.home.HomeScreen
 import br.com.tomai.ui.login.LoginScreen
 import br.com.tomai.ui.login.RecuperarSenhaScreen
 import br.com.tomai.ui.doses.DosesDiaScreen
+import br.com.tomai.ui.doses.HistoricoDosesScreen
 import br.com.tomai.ui.medicamentos.MedicamentoFormScreen
 import br.com.tomai.ui.medicamentos.MedicamentosListScreen
 import br.com.tomai.ui.responsaveis.PessoasConfiancaScreen
@@ -78,14 +79,19 @@ fun AppNavGraph(
         }
 
         composable(Screen.Home.rota) {
+            val homeDoseViewModel: DoseViewModel = viewModel()
+            val homeAssinaturaViewModel: AssinaturaViewModel = viewModel()
             HomeScreen(
                 viewModel = viewModel,
+                doseViewModel = homeDoseViewModel,
+                assinaturaViewModel = homeAssinaturaViewModel,
                 onNavegarMedicamentos = {
                     navController.navigate(Screen.Medicamentos.rota)
                 },
                 onNavegarDosesDia = {
                     navController.navigate(Screen.DosesDia.rota)
                 },
+                onNavegarHistorico = { navController.navigate(Screen.HistoricoDoses.rota) },
                 onNavegarPessoasConfianca = {
                     navController.navigate(Screen.PessoasConfianca.rota)
                 },
@@ -103,6 +109,15 @@ fun AppNavGraph(
             val uid = viewModel.obterUidAutenticado().orEmpty()
             DosesDiaScreen(
                 usuarioId = uid,
+                viewModel = doseViewModel,
+                onVoltar = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.HistoricoDoses.rota) {
+            val doseViewModel: DoseViewModel = viewModel()
+            HistoricoDosesScreen(
+                usuarioId = viewModel.obterUidAutenticado().orEmpty(),
                 viewModel = doseViewModel,
                 onVoltar = { navController.popBackStack() }
             )
