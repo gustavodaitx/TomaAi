@@ -47,6 +47,8 @@ import br.com.tomai.viewmodel.AuthViewModel
 @Composable
 fun HomeScreen(
     viewModel: AuthViewModel,
+    onNavegarMedicamentos: () -> Unit = {},
+    onNavegarDosesDia: () -> Unit = {},
     onLogoutConcluido: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -222,7 +224,6 @@ fun HomeScreen(
                 }
             }
 
-            // Próximos Módulos Prontos para Ativação
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
@@ -236,13 +237,75 @@ fun HomeScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Próximos Recursos",
+                        text = "Módulo 2 — Medicamentos",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "• Módulo 2: Cadastro de Medicamentos e Horários\n• Módulo 3: Controle e Confirmação de Doses diárias\n• Módulo 4: Responsáveis de Confiança & Alertas\n• Módulo 5: Planos e Assinatura Asaas",
+                        text = "Cadastre nome, dosagem, frequência, horários e estoque. Dados salvos em /medicamentos vinculados ao seu UID.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AppButton(
+                        text = "Meus Medicamentos",
+                        onClick = onNavegarMedicamentos
+                    )
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Módulo 3 — Doses de hoje",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Checklist diário: Tomado, Pular ou Atrasado. Lembretes locais nos horários cadastrados.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AppButton(
+                        text = "Abrir checklist de hoje",
+                        onClick = onNavegarDosesDia
+                    )
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Próximos Módulos",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "• Módulo 4: Responsáveis de confiança\n• Módulo 5: Planos Asaas",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

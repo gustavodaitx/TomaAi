@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /usuarios/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /medicamentos/{medicamentoId} {
+      allow read: if isSignedIn()
+        && resource.data.usuarioId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.usuarioId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.usuarioId == request.auth.uid
+        && request.resource.data.usuarioId == request.auth.uid;
+    }
+
+    match /doses/{doseId} {
+      allow read: if isSignedIn()
+        && resource.data.usuarioId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.usuarioId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.usuarioId == request.auth.uid
+        && request.resource.data.usuarioId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.usuarioId == request.auth.uid;
+    }
+  }
+}
