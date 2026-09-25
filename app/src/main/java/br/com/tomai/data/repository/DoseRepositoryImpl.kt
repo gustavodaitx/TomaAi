@@ -4,6 +4,7 @@ import android.util.Log
 import br.com.tomai.model.Dose
 import br.com.tomai.model.Medicamento
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -14,7 +15,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class DoseRepositoryImpl(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) : DoseRepository {
 
     companion object {
@@ -75,8 +77,13 @@ class DoseRepositoryImpl(
         dataAgenda: String
     ): Result<Unit> {
         return try {
-            if (usuarioId.isBlank()) {
-                return Result.failure(IllegalStateException("Usuário não identificado."))
+            val authenticatedUid = auth.currentUser?.uid
+                ?: return Result.failure(IllegalStateException("Sessão expirada. Faça login novamente."))
+            if (usuarioId.isNotBlank() && usuarioId != authenticatedUid) {
+                return Result.failure(IllegalStateException("O usuário da sessão não corresponde ao usuário da agenda."))
+            }
+            if (medicamentos.any { it.ativo && it.usuarioId != authenticatedUid }) {
+                return Result.failure(IllegalStateException("A agenda contém medicamentos de outro usuário."))
             }
             var batch = firestore.batch()
             var operacoes = 0
@@ -91,7 +98,7 @@ class DoseRepositoryImpl(
                 medicamento.horarios.forEach { horario ->
                     if (horario.hora.isBlank()) return@forEach
                     val doseId = Dose.idDeterministico(
-                        usuarioId = usuarioId,
+                        usuarioId = authenticatedUid,
                         dataAgenda = dataAgenda,
                         medicamentoId = medicamento.id,
                         horarioProgramado = horario.hora
@@ -100,7 +107,7 @@ class DoseRepositoryImpl(
                     val snapshot = docRef.get().await()
                     if (!snapshot.exists()) {
                         val payload = mapOf(
-                            "usuarioId" to usuarioId,
+                            "usuarioId" to authenticatedUid,
                             "medicamentoId" to medicamento.id,
                             "medicamentoNome" to medicamento.nome,
                             "nomeMedicamento" to medicamento.nome,
