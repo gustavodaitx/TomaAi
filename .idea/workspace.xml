@@ -10,14 +10,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ca9146bd-de5e-4db9-aa4f-6c8e74d5dc49" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gradle/8.7/checksums/checksums.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/checksums/checksums.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.7/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/executionHistory/executionHistory.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/components/AppButton.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/components/AppButton.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/theme/Color.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/theme/Color.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/theme/Theme.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/theme/Theme.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TASK.md" beforeDir="false" afterPath="$PROJECT_DIR$/TASK.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/DoseRepositoryImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/DoseRepositoryImpl.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/model/Medicamento.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/model/Medicamento.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/doses/HistoricoDosesScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/doses/HistoricoDosesScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/home/HomeScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/home/HomeScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/medicamentos/MedicamentoFormScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/medicamentos/MedicamentoFormScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/MedicamentoUiState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/MedicamentoUiState.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/MedicamentoViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/MedicamentoViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/functions/src/alerts/verificarDosesNaoConfirmadas.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/alerts/verificarDosesNaoConfirmadas.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/functions/src/notifications/notificationService.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/notifications/notificationService.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

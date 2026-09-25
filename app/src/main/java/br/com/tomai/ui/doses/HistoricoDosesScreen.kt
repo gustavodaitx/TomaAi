@@ -14,6 +14,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -56,6 +60,8 @@ private enum class PeriodoHistorico(val titulo: String, val dias: Long) {
 fun HistoricoDosesScreen(usuarioId: String, viewModel: DoseViewModel, onVoltar: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     var periodo by remember { mutableStateOf(PeriodoHistorico.HOJE) }
+    var medicamentoFiltro by remember { mutableStateOf("Todos") }
+    var menuMedicamentosAberto by remember { mutableStateOf(false) }
     var doseSelecionada by remember { mutableStateOf<Dose?>(null) }
     val hoje = LocalDate.now()
     val formatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -94,6 +100,21 @@ fun HistoricoDosesScreen(usuarioId: String, viewModel: DoseViewModel, onVoltar: 
                         FilterChip(selected = periodo == opcao, onClick = { periodo = opcao }, label = { Text(opcao.titulo) })
                     }
                 }
+                val medicamentos = listOf("Todos") + state.historico.map { it.medicamentoNome }.distinct().sorted()
+                ExposedDropdownMenuBox(expanded = menuMedicamentosAberto,
+                    onExpandedChange = { menuMedicamentosAberto = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                    OutlinedTextField(value = medicamentoFiltro, onValueChange = {}, readOnly = true,
+                        label = { Text("Filtrar por medicamento") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menuMedicamentosAberto) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor())
+                    ExposedDropdownMenu(expanded = menuMedicamentosAberto, onDismissRequest = { menuMedicamentosAberto = false }) {
+                        medicamentos.forEach { nome -> DropdownMenuItem(text = { Text(nome) }, onClick = {
+                            medicamentoFiltro = nome
+                            menuMedicamentosAberto = false
+                        }) }
+                    }
+                }
                 Text("${periodo.titulo} · ${hoje.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}",
                     Modifier.padding(horizontal = 20.dp, vertical = 4.dp), style = MaterialTheme.typography.titleSmall)
                 when {
@@ -105,7 +126,7 @@ fun HistoricoDosesScreen(usuarioId: String, viewModel: DoseViewModel, onVoltar: 
                         Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     else -> LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(state.historico, key = { it.id }) { dose ->
+                        items(state.historico.filter { medicamentoFiltro == "Todos" || it.medicamentoNome == medicamentoFiltro }, key = { it.id }) { dose ->
                             Card(onClick = { doseSelecionada = dose }, modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {

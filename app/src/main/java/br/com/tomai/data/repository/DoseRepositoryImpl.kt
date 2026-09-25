@@ -81,7 +81,13 @@ class DoseRepositoryImpl(
             val batch = firestore.batch()
             var operacoes = 0
 
-            medicamentos.filter { it.ativo }.forEach { medicamento ->
+            medicamentos.filter { it.ativo }.forEach medicamentoLoop@ { medicamento ->
+                val data = runCatching { java.time.LocalDate.parse(dataAgenda) }.getOrNull()
+                    ?: return@medicamentoLoop
+                if (medicamento.dataInicio.isNotBlank() && dataAgenda < medicamento.dataInicio) return@medicamentoLoop
+                if (medicamento.dataFim.isNotBlank() && dataAgenda > medicamento.dataFim) return@medicamentoLoop
+                if (medicamento.frequencia == Medicamento.FREQUENCIA_PERSONALIZADA &&
+                    data.dayOfWeek.value !in medicamento.diasSemana) return@medicamentoLoop
                 medicamento.horarios.forEach { horario ->
                     if (horario.hora.isBlank()) return@forEach
                     val doseId = Dose.idDeterministico(

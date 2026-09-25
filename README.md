@@ -276,3 +276,11 @@ erDiagram
 ## 11. Considera√ß√µes
 
 A integra√ß√£o dever√° ser desenvolvida inicialmente em ambiente Sandbox. Antes da utiliza√ß√£o em produ√ß√£o, dever√£o ser realizados testes de autentica√ß√£o, cria√ß√£o de clientes, cria√ß√£o de assinaturas, processamento de cobran√ßas, cancelamentos, eventos duplicados e falhas de comunica√ß√£o.
+
+## Avisos para pessoa de confianÁa
+
+O backend possui um adaptador Firebase Cloud Messaging (FCM), mas o app n„o registra nem salva um token FCM da pessoa de confianÁa e as regras do Firestore n„o permitem esse campo. Sem esse token, a rotina grava um alerta com estado `SEM_CANAL_CONFIGURADO` e n„o simula entrega. Para habilitar push, È necess·rio integrar Firebase Messaging no Android, associar com seguranÁa o token ‡ pessoa autorizada e atualizar as regras. N„o h· provedor de e-mail, SMS ou WhatsApp configurado. E-mail exigir· um provedor transacional com credenciais guardadas apenas no backend; SMS e WhatsApp exigem provedor oficial e credenciais no backend.
+
+## Assinaturas
+
+As opÁıes de 15 e 30 dias vÍm do backend. Configure `PRECO_QUINZENAL`, `PRECO_MENSAL`, `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` nas vari·veis seguras das Cloud Functions para listar e contratar os planos. A assinatura fica pendente atÈ a confirmaÁ„o do webhook Asaas; clicar em contratar n„o ativa o acesso. O exemplo local de vari·veis est· em `functions/.env.example`.

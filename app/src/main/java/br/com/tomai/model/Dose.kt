@@ -41,7 +41,7 @@ data class Dose(
 ) {
     val estaPendente: Boolean get() = status == STATUS_PENDENTE
 
-    fun estaAtrasada(agora: LocalDateTime = LocalDateTime.now()): Boolean {
+    fun estaAtrasada(agora: LocalDateTime = LocalDateTime.now(ZONE_TOMAAI)): Boolean {
         if (status != STATUS_PENDENTE) return false
         val data = runCatching { LocalDate.parse(dataAgenda) }.getOrNull() ?: return false
         val hora = runCatching { LocalTime.parse(horarioProgramado) }.getOrNull() ?: return false
@@ -67,7 +67,9 @@ data class Dose(
             return "${usuarioId}_${dataAgenda}_${medicamentoId}_$hora"
         }
 
-        fun dataHoje(zoneId: ZoneId = ZoneId.systemDefault()): String {
+        private val ZONE_TOMAAI: ZoneId = ZoneId.of("America/Sao_Paulo")
+
+        fun dataHoje(zoneId: ZoneId = ZONE_TOMAAI): String {
             return LocalDate.now(zoneId).format(formatoData)
         }
 

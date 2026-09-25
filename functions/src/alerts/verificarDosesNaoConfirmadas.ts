@@ -1,8 +1,8 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import { LoggingNotificationService } from "../notifications/notificationService";
+import { FcmNotificationService } from "../notifications/notificationService";
 
-const notifier = new LoggingNotificationService();
+const fcmNotifier = new FcmNotificationService();
 const LIMITE_ATRASO_MS = 30 * 60 * 1000;
 
 export const verificarDosesNaoConfirmadas = functions.pubsub
@@ -25,7 +25,7 @@ export const verificarDosesNaoConfirmadas = functions.pubsub
       .get();
     const limite = Date.now() - LIMITE_ATRASO_MS;
     const batch = db.batch();
-    const notificacoes: Promise<void>[] = [];
+    const notificacoes: Array<() => Promise<void>> = [];
 
     for (const doseDoc of snapshot.docs) {
       const dose = doseDoc.data();
@@ -41,23 +41,30 @@ export const verificarDosesNaoConfirmadas = functions.pubsub
 
       const alertaRef = db.collection("alertas").doc(doseDoc.id);
       const existente = await alertaRef.get();
-      if (existente.exists) continue;
-      batch.create(alertaRef, {
+      const recipient = typeof pessoa.fcmToken === "string" ? pessoa.fcmToken.trim() : "";
+      if (existente.exists && existente.get("status") !== "PENDENTE_ENVIO" &&
+          !(existente.get("status") === "SEM_CANAL_CONFIGURADO" && recipient)) continue;
+      batch.set(alertaRef, {
         usuarioId: dose.usuarioId,
         responsavelId,
         doseId: doseDoc.id,
         medicamentoNome: dose.medicamentoNome || "Medicamento",
         horarioProgramado: dose.horarioProgramado,
-        status: "ABERTO",
+        status: recipient ? "PENDENTE_ENVIO" : "SEM_CANAL_CONFIGURADO",
         criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      notificacoes.push(notifier.notify(
-        responsavelId,
-        "Dose não confirmada",
-        `A dose de ${dose.medicamentoNome || "um medicamento"} ainda não foi confirmada.`
-      ));
+      }, { merge: true });
+      if (recipient) {
+        notificacoes.push(async () => {
+          await fcmNotifier.notify(
+            recipient,
+            "Dose não confirmada",
+            `A dose de ${dose.medicamentoNome || "um medicamento"} ainda não foi confirmada.`
+          );
+          await alertaRef.update({ status: "ENVIADA", enviadaEm: admin.firestore.FieldValue.serverTimestamp() });
+        });
+      }
     }
     await batch.commit();
-    await Promise.all(notificacoes);
+    await Promise.all(notificacoes.map((enviar) => enviar()));
     return null;
   });

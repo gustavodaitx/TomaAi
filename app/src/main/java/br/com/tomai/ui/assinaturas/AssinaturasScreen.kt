@@ -59,10 +59,12 @@ fun AssinaturasScreen(usuarioId: String, viewModel: AssinaturaViewModel, onVolta
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(plano["nome"]?.toString() ?: plano["id"].toString(), style = MaterialTheme.typography.titleMedium)
+                        val dias = (plano["dias"] as? Number)?.toInt()
+                        if (dias != null) Text("$dias dias", style = MaterialTheme.typography.bodyMedium)
                         val valor = (plano["valor"] as? Number)?.toDouble()
                         if (valor != null) Text("R$ %.2f".format(valor))
                         Button(onClick = { viewModel.contratar(plano["id"].toString(), formaPagamento) }, enabled = !state.carregando) {
-                            Text("Contratar no Sandbox")
+                            Text("Selecionar e contratar")
                         }
                     }
                 }

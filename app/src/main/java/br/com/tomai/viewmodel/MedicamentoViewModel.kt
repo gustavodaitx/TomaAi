@@ -50,6 +50,9 @@ class MedicamentoViewModel(
                 nome = "",
                 dosagem = "",
                 frequencia = Medicamento.FREQUENCIA_DIARIA,
+                dataInicio = "",
+                dataFim = "",
+                diasSemana = emptySet(),
                 horarios = emptyList(),
                 estoqueInicial = "",
                 erro = null,
@@ -82,6 +85,9 @@ class MedicamentoViewModel(
                                 nome = medicamento.nome,
                                 dosagem = medicamento.dosagem,
                                 frequencia = medicamento.frequencia,
+                                dataInicio = medicamento.dataInicio,
+                                dataFim = medicamento.dataFim,
+                                diasSemana = medicamento.diasSemana.toSet(),
                                 horarios = medicamento.horarios,
                                 estoqueInicial = medicamento.estoqueInicial.toString(),
                                 isLoadingFormulario = false
@@ -110,8 +116,12 @@ class MedicamentoViewModel(
     }
 
     fun atualizarFrequencia(valor: String) {
-        _uiState.update { it.copy(frequencia = valor, erro = null) }
+        _uiState.update { it.copy(frequencia = valor, diasSemana = if (valor == Medicamento.FREQUENCIA_DIARIA) emptySet() else it.diasSemana, erro = null) }
     }
+
+    fun atualizarDataInicio(valor: String) { _uiState.update { it.copy(dataInicio = valor, erro = null) } }
+    fun atualizarDataFim(valor: String) { _uiState.update { it.copy(dataFim = valor, erro = null) } }
+    fun alternarDiaSemana(dia: Int) { _uiState.update { it.copy(diasSemana = if (dia in it.diasSemana) it.diasSemana - dia else it.diasSemana + dia) } }
 
     fun atualizarEstoqueInicial(valor: String) {
         val filtrado = valor.filter { it.isDigit() }
@@ -159,6 +169,9 @@ class MedicamentoViewModel(
             nome = estado.nome.trim(),
             dosagem = estado.dosagem.trim(),
             frequencia = estado.frequencia,
+            dataInicio = estado.dataInicio.trim(),
+            dataFim = estado.dataFim.trim(),
+            diasSemana = estado.diasSemana.sorted(),
             horarios = estado.horarios.sortedBy { it.hora },
             estoqueInicial = if (edicao != null) edicao.estoqueInicial else estoque,
             estoqueAtual = edicao?.estoqueAtual ?: estoque,
@@ -231,6 +244,11 @@ class MedicamentoViewModel(
         if (estado.horarios.isEmpty()) {
             return "Adicione pelo menos um horário."
         }
+        val dateRegex = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+        if ((estado.dataInicio.isNotBlank() && !dateRegex.matches(estado.dataInicio)) ||
+            (estado.dataFim.isNotBlank() && !dateRegex.matches(estado.dataFim))) return "Use datas no formato AAAA-MM-DD."
+        if (estado.dataInicio.isNotBlank() && estado.dataFim.isNotBlank() && estado.dataFim < estado.dataInicio) return "A data final deve ser igual ou posterior à inicial."
+        if (estado.frequencia == Medicamento.FREQUENCIA_PERSONALIZADA && estado.diasSemana.isEmpty()) return "Selecione ao menos um dia da semana."
         return null
     }
 

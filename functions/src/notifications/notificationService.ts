@@ -1,11 +1,17 @@
+import * as admin from "firebase-admin";
+
 export interface NotificationService {
   notify(recipient: string, title: string, body: string): Promise<void>;
 }
 
-/** Development adapter. Replace with FCM, SMS, or email without coupling alert rules to a provider. */
-export class LoggingNotificationService implements NotificationService {
+/** FCM adapter for trusted device tokens stored on a person of trust. */
+export class FcmNotificationService implements NotificationService {
   async notify(recipient: string, title: string, body: string): Promise<void> {
-    void body;
-    console.info("Notification stub", { recipient, title });
+    const token = recipient.trim();
+    if (!token) return;
+    await admin.messaging().send({
+      token,
+      notification: { title, body },
+    });
   }
 }

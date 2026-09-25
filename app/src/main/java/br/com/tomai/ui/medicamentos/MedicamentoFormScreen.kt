@@ -19,6 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -171,6 +172,22 @@ fun MedicamentoFormScreen(
                     )
                 }
             }
+
+            if (uiState.frequencia == Medicamento.FREQUENCIA_PERSONALIZADA) {
+                Text("Dias da semana", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom").forEachIndexed { index, label ->
+                        FilterChip(selected = index + 1 in uiState.diasSemana,
+                            onClick = { viewModel.alternarDiaSemana(index + 1) }, label = { Text(label) })
+                    }
+                }
+            }
+            OutlinedTextField(value = uiState.dataInicio, onValueChange = viewModel::atualizarDataInicio,
+                label = { Text("Data de início (opcional)") }, placeholder = { Text("AAAA-MM-DD") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = uiState.dataFim, onValueChange = viewModel::atualizarDataFim,
+                label = { Text("Data de término (opcional)") }, placeholder = { Text("AAAA-MM-DD") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true)
 
             if (!isEdicao) {
                 AppTextField(

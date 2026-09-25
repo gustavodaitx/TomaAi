@@ -30,7 +30,7 @@
   - *Status:* ✅ **Concluído** — Coleção `/medicamentos` vinculada ao `usuarioId`, `MedicamentoRepositoryImpl`, `MedicamentoViewModel`, telas Compose (listagem + formulário) e navegação integrada a partir da `HomeScreen`.
 - [x] **T2.2 — Configuração de Horários Recorrentes (`HorarioMedicamento`)**
   - *Aceite:* Associação 1:N entre medicamento e horários com definição de frequência e datas início/fim.
-  - *Status:* ✅ **Concluído** — Horários embarcados no documento + `TimePicker` Material 3; frequência `DIARIA` / `PERSONALIZADA` (datas início/fim preparadas para a agenda).
+  - *Status:* ✅ **Concluído** — Horários embarcados no documento + `TimePicker` Material 3; frequência diária ou dias da semana selecionados e datas de início/fim opcionais aplicadas à geração da agenda.
 
 ---
 
@@ -46,9 +46,9 @@
 - [x] **T3.3 — Lembretes locais nos horários**
   - *Aceite:* Notificações nos horários cadastrados.
   - *Status:* ✅ **Concluído** — `AlarmManager` + `DoseReminderReceiver` configurados; suporte à permissão `POST_NOTIFICATIONS` (Android 13+ / API 33+).
-- [ ] **T3.4 — Histórico Completo de Doses com Filtros**
+- [x] **T3.4 — Histórico Completo de Doses com Filtros**
   - *Aceite:* Tela de histórico permitindo filtrar por período de datas e por medicamento específico.
-  - *Status:* ⏳ **Pendente**
+  - *Status:* ✅ **Concluído** — Histórico com filtros de período (hoje, semana e mês) e medicamento, além de detalhes da dose.
 
 ---
 
@@ -59,8 +59,9 @@
   - *Aceite:* Tela de cadastro/listagem com flag `aceitouReceberAvisos` e atribuição de `responsavelPadraoId` no perfil do usuário (`/usuarios/{uid}`).
 - [x] **T4.2 — Lógica de Disparo de Alertas por Dose Não Confirmada**
   - *Aceite:* Verificação de estouro de tempo limite após horário programado sem confirmação da dose e gravação do registro na coleção `/alertas`.
-- [ ] **T4.3 — Camada Abstrata para Envio de Notificações (SMS / E-mail / Push)**
+- [x] **T4.3 — Camada Abstrata para Envio de Notificações (SMS / E-mail / Push)**
   - *Aceite:* Interface Service com implementação stub/mock e Cloud Functions + FCM preparada para notificações ao responsável sem dependência direta de provedores pagos em ambiente dev.
+  - *Status:* ✅ **Concluído** — Alertas usam a interface `NotificationService`, com adaptador de log em desenvolvimento e adaptador FCM para tokens registrados na pessoa de confiança.
 
 ---
 
@@ -96,9 +97,7 @@
 
 1. ~~Módulo 1: Autenticação e Perfil~~ ✅
 2. ~~Módulo 2: Medicamentos e Horários~~ ✅
-3. Módulo 3: Controle de Doses
-   - [x] T3.1, T3.2 e T3.3 ✅
-   - [ ] T3.4 — Histórico Completo de Doses ⏳ *(Em andamento)*
-4. **Módulo 4: Responsáveis de Confiança & Alertas** *(Próximo módulo)*
+3. ~~Módulo 3: Controle de Doses~~ ✅
+4. ~~Módulo 4: Responsáveis de Confiança & Alertas~~ ✅
 5. **Módulo 5: Planos e Assinatura Asaas**
 6. **Módulo 6: Testes, Segurança Rules & Refatoração Geral**

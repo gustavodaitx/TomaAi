@@ -21,6 +21,12 @@ data class Medicamento(
 
     val frequencia: String = FREQUENCIA_DIARIA,
 
+    val dataInicio: String = "",
+
+    val dataFim: String = "",
+
+    val diasSemana: List<Int> = emptyList(),
+
     val horarios: List<HorarioMedicamento> = emptyList(),
 
     val estoqueInicial: Int = 0,
@@ -62,6 +68,9 @@ data class Medicamento(
                 nome = data["nome"] as? String ?: "",
                 dosagem = data["dosagem"] as? String ?: "",
                 frequencia = data["frequencia"] as? String ?: FREQUENCIA_DIARIA,
+                dataInicio = data["dataInicio"] as? String ?: "",
+                dataFim = data["dataFim"] as? String ?: "",
+                diasSemana = (data["diasSemana"] as? List<*>)?.mapNotNull { (it as? Number)?.toInt() } ?: emptyList(),
                 horarios = horarios,
                 estoqueInicial = (data["estoqueInicial"] as? Number)?.toInt() ?: 0,
                 estoqueAtual = (data["estoqueAtual"] as? Number)?.toInt()
@@ -83,6 +92,9 @@ data class Medicamento(
         "nome" to nome.trim(),
         "dosagem" to dosagem.trim(),
         "frequencia" to frequencia,
+        "dataInicio" to dataInicio,
+        "dataFim" to dataFim,
+        "diasSemana" to diasSemana,
         "horarios" to horarios.map { it.toMap() },
         "estoqueInicial" to estoqueInicial,
         "estoqueAtual" to estoqueAtual,

@@ -67,11 +67,13 @@ fun PessoasConfiancaScreen(
     var mostrarSucesso by remember { mutableStateOf(false) }
     var nomeSalvo by remember { mutableStateOf("") }
     var telefoneSalvo by remember { mutableStateOf("") }
+    var emailSalvo by remember { mutableStateOf("") }
+    var pessoaEmEdicao by remember { mutableStateOf<br.com.tomai.model.PessoaConfianca?>(null) }
 
     LaunchedEffect(usuarioId) { viewModel.carregar(usuarioId) }
     LaunchedEffect(state.mensagem) {
         val mensagem = state.mensagem.orEmpty()
-        if (mensagem.contains("cadastrada", ignoreCase = true)) {
+        if (mensagem.contains("cadastrada", ignoreCase = true) || mensagem.contains("atualizada", ignoreCase = true)) {
             mostrarFormulario = false
             mostrarSucesso = true
             nome = ""
@@ -113,18 +115,20 @@ fun PessoasConfiancaScreen(
                     Icon(Icons.Default.CheckCircle, contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(64.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text("Pessoa cadastrada!", style = MaterialTheme.typography.headlineSmall,
+                    Text("Dados salvos!", style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                     Card(Modifier.fillMaxWidth().padding(top = 20.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(nomeSalvo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(emailSalvo, style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(telefoneSalvo.ifBlank { "Contato salvo com segurança" },
                                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    Text("Será avisado quando uma dose não for confirmada.",
+                    Text("O envio de avisos depende de um canal de notificação configurado.",
                         style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(24.dp))
@@ -136,7 +140,7 @@ fun PessoasConfiancaScreen(
                     Modifier.fillMaxSize().padding(padding).padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text("Adicionar pessoa de confiança", style = MaterialTheme.typography.titleLarge,
+                    Text(if (pessoaEmEdicao == null) "Adicionar pessoa de confiança" else "Editar pessoa de confiança", style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold)
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -158,10 +162,11 @@ fun PessoasConfiancaScreen(
                                 Switch(checked = aceitouAvisos, onCheckedChange = { aceitouAvisos = it })
                             }
                             state.erro?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                            TomaAiButton("Salvar", onClick = {
+                            TomaAiButton(if (pessoaEmEdicao == null) "Salvar" else "Salvar alterações", onClick = {
                                 nomeSalvo = nome.trim()
                                 telefoneSalvo = telefone.trim()
-                                viewModel.salvar(usuarioId, nome, email, telefone, aceitouAvisos)
+                                emailSalvo = email.trim()
+                                viewModel.salvar(usuarioId, nome, email, telefone, aceitouAvisos, pessoaEmEdicao?.id.orEmpty())
                             }, isLoading = state.carregando)
                         }
                     }
@@ -206,9 +211,18 @@ fun PessoasConfiancaScreen(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(pessoa.nome, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                        Text(pessoa.telefone.ifBlank { pessoa.email }, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        if (pessoa.telefone.isNotBlank()) Text(pessoa.telefone, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(pessoa.email, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text(if (pessoa.aceitouReceberAvisos) "Recebe avisos de doses" else "Avisos desativados",
                                             style = MaterialTheme.typography.bodySmall)
+                                        OutlinedButton(onClick = {
+                                            pessoaEmEdicao = pessoa
+                                            nome = pessoa.nome
+                                            email = pessoa.email
+                                            telefone = pessoa.telefone
+                                            aceitouAvisos = pessoa.aceitouReceberAvisos
+                                            mostrarFormulario = true
+                                        }, enabled = !state.carregando) { Text("Editar") }
                                         if (responsavelPadraoId == pessoa.id) {
                                             Text("Responsável padrão", color = MaterialTheme.colorScheme.primary,
                                                 style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -223,7 +237,11 @@ fun PessoasConfiancaScreen(
                             }
                         }
                     }
-                    Button(onClick = { mostrarFormulario = true },
+                    Button(onClick = {
+                        pessoaEmEdicao = null
+                        nome = ""; email = ""; telefone = ""; aceitouAvisos = false
+                        mostrarFormulario = true
+                    },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
                         enabled = !state.carregando) {
                         Icon(Icons.Default.PersonAdd, contentDescription = null)

@@ -12,7 +12,9 @@ class PessoaConfiancaRepository(
         .documents.mapNotNull { it.toObject(PessoaConfianca::class.java)?.copy(id = it.id) }
 
     suspend fun salvar(usuarioId: String, pessoa: PessoaConfianca): String {
-        val ref = firestore.collection(COLECAO).document()
+        require(usuarioId.isNotBlank()) { "Usuário não identificado." }
+        val colecao = firestore.collection(COLECAO)
+        val ref = pessoa.id.takeIf(String::isNotBlank)?.let(colecao::document) ?: colecao.document()
         ref.set(pessoa.copy(id = ref.id, usuarioId = usuarioId)).await()
         return ref.id
     }
