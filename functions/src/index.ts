@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import { criarClienteNoAsaas } from "./asaas/clientes";
+import { clienteExisteNoAsaas, criarClienteNoAsaas } from "./asaas/clientes";
 import { cancelarAssinaturaNoAsaas, criarAssinaturaNoAsaas, DadosCartaoAsaas } from "./asaas/assinaturas";
 import { obterPixDaCobranca, removerCobrancaPendente, sincronizarCobrancasNoAsaas } from "./asaas/cobrancas";
 import { processarAsaasWebhook } from "./webhooks/asaasWebhook";
@@ -92,7 +92,7 @@ export const criarAssinaturaAsaas = functions.https.onCall(async (data, context)
     }
   }
   let customerId = user.asaasCustomerId as string | undefined;
-  if (!customerId) {
+  if (!customerId || !(await clienteExisteNoAsaas(customerId))) {
     const email = context.auth?.token.email as string | undefined;
     if (!user.nome || !email) throw new functions.https.HttpsError("failed-precondition", "Nome e e-mail são necessários para iniciar o pagamento.");
     customerId = await criarClienteNoAsaas(user.nome, email);

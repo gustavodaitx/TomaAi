@@ -1,0 +1,92 @@
+[debug] [2026-09-25T22:02:08.936Z] ----------------------------------------------------------------------
+[debug] [2026-09-25T22:02:08.939Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Gustavo Daitx\AppData\Local\npm-cache\_npx\ba4f1959e38407b5\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions:criarAssinaturaAsaas --project tomai-ede43
+[debug] [2026-09-25T22:02:08.939Z] CLI Version:   15.31.0
+[debug] [2026-09-25T22:02:08.939Z] Platform:      win32
+[debug] [2026-09-25T22:02:08.939Z] Node Version:  v22.19.0
+[debug] [2026-09-25T22:02:08.939Z] Detected Agent: codex_cli
+[debug] [2026-09-25T22:02:08.939Z] Time:          Fri Sep 25 2026 19:02:08 GMT-0300 (Horário Padrão de Brasília)
+[debug] [2026-09-25T22:02:08.939Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-09-25T22:02:10.381Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-09-25T22:02:10.381Z] > authorizing via signed-in user (gustavodaitx@gmail.com)
+[debug] [2026-09-25T22:02:10.382Z] [iam] checking project tomai-ede43 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-09-25T22:02:10.390Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:10.390Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:10.391Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43:testIamPermissions [none]
+[debug] [2026-09-25T22:02:10.391Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43:testIamPermissions  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:10.391Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-09-25T22:02:11.446Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43:testIamPermissions 200
+[debug] [2026-09-25T22:02:11.447Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-09-25T22:02:11.448Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:11.448Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:11.449Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/tomai-ede43/serviceAccounts/tomai-ede43@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-09-25T22:02:11.450Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/tomai-ede43/serviceAccounts/tomai-ede43@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-09-25T22:02:12.504Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/tomai-ede43/serviceAccounts/tomai-ede43@appspot.gserviceaccount.com:testIamPermissions 404
+[debug] [2026-09-25T22:02:12.505Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/tomai-ede43/serviceAccounts/tomai-ede43@appspot.gserviceaccount.com:testIamPermissions {"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}}
+[debug] [2026-09-25T22:02:12.507Z] [functions] service account IAM check errored, deploy may fail: Request to https://iam.googleapis.com/v1/projects/tomai-ede43/serviceAccounts/tomai-ede43@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account {"name":"FirebaseError","children":[],"context":{"body":{"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}},"response":{"statusCode":404}},"exit":1,"message":"Request to https://iam.googleapis.com/v1/projects/tomai-ede43/serviceAccounts/tomai-ede43@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account","status":404}
+[info] 
+[info] === Deploying to 'tomai-ede43'...
+[info] 
+[info] i  deploying functions 
+[debug] [2026-09-25T22:02:12.528Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:12.528Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:12.529Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudresourcemanager.googleapis.com [none]
+[debug] [2026-09-25T22:02:12.529Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudresourcemanager.googleapis.com  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:13.695Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudresourcemanager.googleapis.com 200
+[debug] [2026-09-25T22:02:13.696Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudresourcemanager.googleapis.com [omitted]
+[debug] [2026-09-25T22:02:13.719Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:13.720Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:13.720Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43 [none]
+[debug] [2026-09-25T22:02:13.957Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43 200
+[debug] [2026-09-25T22:02:13.957Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/tomai-ede43 {"projectNumber":"387833094529","projectId":"tomai-ede43","lifecycleState":"ACTIVE","name":"tomai","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2026-09-21T21:51:47.159Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[debug] [2026-09-25T22:02:13.980Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:13.981Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:13.992Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:13.992Z] Checked if tokens are valid: true, expires at: 1790377308549
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[debug] [2026-09-25T22:02:14.006Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:14.007Z] Checked if tokens are valid: true, expires at: 1790377308549
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-09-25T22:02:14.019Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:14.019Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:14.025Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com [none]
+[debug] [2026-09-25T22:02:14.025Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:14.032Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/runtimeconfig.googleapis.com [none]
+[debug] [2026-09-25T22:02:14.032Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/runtimeconfig.googleapis.com  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:14.045Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudbuild.googleapis.com [none]
+[debug] [2026-09-25T22:02:14.045Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudbuild.googleapis.com  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:14.054Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com [none]
+[debug] [2026-09-25T22:02:14.058Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:14.369Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com 200
+[debug] [2026-09-25T22:02:14.369Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com [omitted]
+[warn] !  functions: missing required API cloudfunctions.googleapis.com. Enabling now... 
+[debug] [2026-09-25T22:02:14.373Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:14.374Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:14.375Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com:enable [none]
+[debug] [2026-09-25T22:02:14.376Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com:enable  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:15.180Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/runtimeconfig.googleapis.com 200
+[debug] [2026-09-25T22:02:15.181Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/runtimeconfig.googleapis.com [omitted]
+[debug] [2026-09-25T22:02:15.199Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudbuild.googleapis.com 200
+[debug] [2026-09-25T22:02:15.200Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudbuild.googleapis.com [omitted]
+[warn] !  functions: missing required API cloudbuild.googleapis.com. Enabling now... 
+[debug] [2026-09-25T22:02:15.204Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:15.204Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:15.204Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudbuild.googleapis.com:enable [none]
+[debug] [2026-09-25T22:02:15.204Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudbuild.googleapis.com:enable  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:15.213Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com 200
+[debug] [2026-09-25T22:02:15.214Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com [omitted]
+[warn] !  artifactregistry: missing required API artifactregistry.googleapis.com. Enabling now... 
+[debug] [2026-09-25T22:02:15.215Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:15.216Z] Checked if tokens are valid: true, expires at: 1790377308549
+[debug] [2026-09-25T22:02:15.218Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com:enable [none]
+[debug] [2026-09-25T22:02:15.218Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com:enable  x-goog-user-project=tomai-ede43
+[debug] [2026-09-25T22:02:15.338Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com:enable 200
+[debug] [2026-09-25T22:02:15.338Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/cloudfunctions.googleapis.com:enable [omitted]
+[debug] [2026-09-25T22:02:15.536Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com:enable 400
+[debug] [2026-09-25T22:02:15.536Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/tomai-ede43/services/artifactregistry.googleapis.com:enable [omitted]
+[error] 
+[error] Error: Your project tomai-ede43 must be on the Blaze (pay-as-you-go) plan to complete this command. Required API artifactregistry.googleapis.com can't be enabled until the upgrade is complete. To upgrade, visit the following URL:
+
+https://console.firebase.google.com/project/tomai-ede43/usage/details

@@ -1,5 +1,20 @@
 import axios from "axios";
 
+export async function clienteExisteNoAsaas(customerId: string): Promise<boolean> {
+  const asaasUrl = process.env.ASAAS_URL || "https://api-sandbox.asaas.com/v3";
+  const apiKey = process.env.ASAAS_API_KEY || "";
+  if (!apiKey) throw new Error("ASAAS_API_KEY não configurada no ambiente do backend.");
+  try {
+    await axios.get(`${asaasUrl}/customers/${encodeURIComponent(customerId)}`, {
+      headers: { access_token: apiKey, "Content-Type": "application/json" },
+    });
+    return true;
+  } catch (error: any) {
+    if (error?.response?.status === 404) return false;
+    throw error;
+  }
+}
+
 export async function criarClienteNoAsaas(
   nome: string,
   email: string,

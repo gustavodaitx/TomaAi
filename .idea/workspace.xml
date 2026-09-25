@@ -9,7 +9,10 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ca9146bd-de5e-4db9-aa4f-6c8e74d5dc49" name="Changes" comment="" />
+    <list default="true" id="ca9146bd-de5e-4db9-aa4f-6c8e74d5dc49" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/functions/src/asaas/clientes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/asaas/clientes.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/functions/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/index.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
