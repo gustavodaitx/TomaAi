@@ -106,23 +106,30 @@ class DoseRepositoryImpl(
                     val docRef = firestore.collection(COLECAO_DOSES).document(doseId)
                     val snapshot = docRef.get().await()
                     if (!snapshot.exists()) {
-                        val payload = mapOf(
-                            "usuarioId" to authenticatedUid,
-                            "medicamentoId" to medicamento.id,
-                            "medicamentoNome" to medicamento.nome,
-                            "nomeMedicamento" to medicamento.nome,
-                            "dosagem" to medicamento.dosagem,
-                            "dataAgenda" to dataAgenda,
-                            "data" to dataAgenda,
-                            "horarioProgramado" to horario.hora,
-                            "horario" to horario.hora,
-                            "status" to Dose.STATUS_PENDENTE,
+                        val dose = Dose(
+                            id = doseId,
+                            usuarioId = authenticatedUid,
+                            medicamentoId = medicamento.id,
+                            medicamentoNome = medicamento.nome,
+                            dosagem = medicamento.dosagem,
+                            dataAgenda = dataAgenda,
+                            horarioProgramado = horario.hora,
+                            status = Dose.STATUS_PENDENTE
+                        )
+                        check(dose.usuarioId == authenticatedUid) {
+                            "A dose precisa pertencer ao usuário autenticado antes do batch."
+                        }
+                        val payload = dose.toMap() + mapOf(
+                            "nomeMedicamento" to dose.medicamentoNome,
+                            "data" to dose.dataAgenda,
+                            "horario" to dose.horarioProgramado,
                             "criadoEm" to FieldValue.serverTimestamp()
                         )
                         batch.set(docRef, payload)
                         operacoes++
                     } else {
                         val meta = mapOf(
+                            "usuarioId" to authenticatedUid,
                             "medicamentoNome" to medicamento.nome,
                             "nomeMedicamento" to medicamento.nome,
                             "dosagem" to medicamento.dosagem
