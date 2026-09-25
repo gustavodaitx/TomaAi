@@ -2,24 +2,24 @@ package br.com.tomai.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Paleta Primária - Teal Médico / Saúde
-val PrimaryLight = Color(0xFF006874)
+// Paleta oficial TomaAí.
+val PrimaryLight = Color(0xFF0288D1)
 val OnPrimaryLight = Color(0xFFFFFFFF)
 val PrimaryContainerLight = Color(0xFF97F0FF)
 val OnPrimaryContainerLight = Color(0xFF001F24)
 
-val PrimaryDark = Color(0xFF4FD8EB)
+val PrimaryDark = Color(0xFF83CFFF)
 val OnPrimaryDark = Color(0xFF00363D)
 val PrimaryContainerDark = Color(0xFF004F58)
 val OnPrimaryContainerDark = Color(0xFF97F0FF)
 
 // Paleta Secundária - Ardósia Suave
-val SecondaryLight = Color(0xFF4A6267)
+val SecondaryLight = Color(0xFF005B9F)
 val OnSecondaryLight = Color(0xFFFFFFFF)
 val SecondaryContainerLight = Color(0xFFCCE8ED)
 val OnSecondaryContainerLight = Color(0xFF051F23)
 
-val SecondaryDark = Color(0xFFB0CCD1)
+val SecondaryDark = Color(0xFF9CCBEB)
 val OnSecondaryDark = Color(0xFF1B3438)
 val SecondaryContainerDark = Color(0xFF324B4F)
 val OnSecondaryContainerDark = Color(0xFFCCE8ED)
@@ -55,7 +55,7 @@ val OutlineDark = Color(0xFF899294)
 // Cores Semânticas
 val ErrorLight = Color(0xFFBA1A1A)
 val OnErrorLight = Color(0xFFFFFFFF)
-val SuccessGreen = Color(0xFF1E824C)
+val SuccessGreen = Color(0xFF2E7D32)
 val BlueHealthPrimary = Color(0xFF0288D1)
 val BlueHealthDark = Color(0xFF005B9F)
 val GreenSuccess = Color(0xFF2E7D32)

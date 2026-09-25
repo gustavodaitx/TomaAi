@@ -18,7 +18,7 @@ import br.com.tomai.ui.doses.HistoricoDosesScreen
 import br.com.tomai.ui.medicamentos.MedicamentoFormScreen
 import br.com.tomai.ui.medicamentos.MedicamentosListScreen
 import br.com.tomai.ui.responsaveis.PessoasConfiancaScreen
-import br.com.tomai.ui.assinaturas.AssinaturasScreen
+import br.com.tomai.ui.assinaturas.PlanosEAssinaturaScreen
 import br.com.tomai.viewmodel.AuthViewModel
 import br.com.tomai.viewmodel.DoseViewModel
 import br.com.tomai.viewmodel.MedicamentoViewModel
@@ -136,7 +136,7 @@ fun AppNavGraph(
 
         composable(Screen.Assinaturas.rota) {
             val assinaturaViewModel: AssinaturaViewModel = viewModel()
-            AssinaturasScreen(
+            PlanosEAssinaturaScreen(
                 usuarioId = viewModel.obterUidAutenticado().orEmpty(),
                 viewModel = assinaturaViewModel,
                 onVoltar = { navController.popBackStack() }

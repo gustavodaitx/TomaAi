@@ -1,5 +1,6 @@
 package br.com.tomai.data.repository
 
+import br.com.tomai.model.Plano
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.channels.awaitClose
@@ -11,11 +12,13 @@ class AssinaturaRepository(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance(),
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
-    suspend fun listarPlanos(): List<Map<String, Any?>> {
+    suspend fun listarPlanos(): List<Plano> {
         val result = functions.getHttpsCallable("listarPlanos").call().await()
         val rows = result.getData() as? List<*> ?: return emptyList()
         return rows.filterIsInstance<Map<*, *>>().mapNotNull { row ->
-            row.entries.filter { it.key is String }.associate { it.key as String to it.value }
+            val data = row.entries.filter { it.key is String }.associate { it.key as String to it.value }
+            val id = data["id"] as? String ?: return@mapNotNull null
+            Plano.fromMap(id, data)
         }
     }
 

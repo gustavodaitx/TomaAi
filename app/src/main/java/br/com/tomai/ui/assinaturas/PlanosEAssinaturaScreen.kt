@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,11 +37,20 @@ import br.com.tomai.ui.components.StatusChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AssinaturasScreen(usuarioId: String, viewModel: AssinaturaViewModel, onVoltar: () -> Unit) {
+fun PlanosEAssinaturaScreen(usuarioId: String, viewModel: AssinaturaViewModel, onVoltar: () -> Unit) {
     val state by viewModel.uiState.collectAsState()
     val clipboard = LocalClipboardManager.current
     var formaPagamento by remember { mutableStateOf("PIX") }
     LaunchedEffect(usuarioId) { viewModel.carregar(usuarioId) }
+    state.pixPayload?.let { payload ->
+        AlertDialog(
+            onDismissRequest = viewModel::limparPixPayload,
+            title = { Text("Pagamento via Pix") },
+            text = { Text(payload, style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = { TextButton(onClick = { clipboard.setText(AnnotatedString(payload)) }) { Text("Copiar código Pix") } },
+            dismissButton = { TextButton(onClick = viewModel::limparPixPayload) { Text("Fechar") } }
+        )
+    }
     Scaffold(topBar = { TopAppBar(title = { Text("Planos e pagamentos") }, navigationIcon = {
         OutlinedButton(onClick = onVoltar) { Text("Voltar") }
     }) }) { padding ->
@@ -55,15 +65,15 @@ fun AssinaturasScreen(usuarioId: String, viewModel: AssinaturaViewModel, onVolta
                 state.erro?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 state.mensagem?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             }
-            items(state.planos, key = { it["id"].toString() }) { plano ->
+            items(state.planos, key = { it.id }) { plano ->
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(plano["nome"]?.toString() ?: plano["id"].toString(), style = MaterialTheme.typography.titleMedium)
-                        val dias = (plano["dias"] as? Number)?.toInt()
+                        Text("Plano ${plano.nome}", style = MaterialTheme.typography.titleMedium)
+                        val dias = plano.diasRecorrencia.takeIf { it > 0 }
                         if (dias != null) Text("$dias dias", style = MaterialTheme.typography.bodyMedium)
-                        val valor = (plano["valor"] as? Number)?.toDouble()
+                        val valor = plano.valor.takeIf { it > 0.0 }
                         if (valor != null) Text("R$ %.2f".format(valor))
-                        Button(onClick = { viewModel.contratar(plano["id"].toString(), formaPagamento) }, enabled = !state.carregando) {
+                        Button(onClick = { viewModel.contratar(plano.id, formaPagamento) }, enabled = !state.carregando && plano.ativo) {
                             Text("Selecionar e contratar")
                         }
                     }

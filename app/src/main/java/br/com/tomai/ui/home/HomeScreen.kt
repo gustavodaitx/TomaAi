@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -37,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.com.tomai.ui.components.TomaAiLogo
+import br.com.tomai.ui.components.DoseCard
+import br.com.tomai.model.Dose
 import br.com.tomai.viewmodel.AssinaturaViewModel
 import br.com.tomai.viewmodel.AuthViewModel
 import br.com.tomai.viewmodel.DoseViewModel
@@ -86,7 +90,7 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { insets ->
         Column(
-            Modifier.fillMaxSize().padding(insets).padding(horizontal = 18.dp, vertical = 12.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(insets).padding(horizontal = 18.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Card(
@@ -139,6 +143,16 @@ fun HomeScreen(
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            doses.doses.take(3).forEach { dose ->
+                DoseCard(
+                    nome = dose.medicamentoNome,
+                    dosagem = dose.dosagem,
+                    horario = dose.horarioProgramado,
+                    status = dose.status,
+                    onConfirmarClick = { doseViewModel.marcarTomado(dose.id, dose.medicamentoId) },
+                    podeConfirmar = dose.status == Dose.STATUS_PENDENTE
                 )
             }
             androidx.compose.material3.Button(onClick = onNavegarHistorico, modifier = Modifier.fillMaxWidth()) {

@@ -3,6 +3,7 @@ package br.com.tomai.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.tomai.data.repository.AssinaturaRepository
+import br.com.tomai.model.Plano
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
@@ -11,7 +12,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 data class AssinaturaUiState(
-    val planos: List<Map<String, Any?>> = emptyList(),
+    val planos: List<Plano> = emptyList(),
     val assinaturas: List<Map<String, Any?>> = emptyList(),
     val cobrancas: List<Map<String, Any?>> = emptyList(),
     val carregando: Boolean = false,
@@ -58,6 +59,10 @@ class AssinaturaViewModel(private val repository: AssinaturaRepository = Assinat
                 .onSuccess { _uiState.value = _uiState.value.copy(carregando = false, pixPayload = it) }
                 .onFailure { falha(it.localizedMessage ?: "Não foi possível obter o QR Pix.") }
         }
+    }
+
+    fun limparPixPayload() {
+        _uiState.value = _uiState.value.copy(pixPayload = null)
     }
 
     private fun operacao(sucesso: String, acao: suspend () -> Any) {

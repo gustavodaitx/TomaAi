@@ -1,6 +1,7 @@
 package br.com.tomai.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -105,8 +107,9 @@ fun DoseCard(
         else -> MaterialTheme.colorScheme.surface
     }
     val animatedContainer by animateColorAsState(container, label = "doseStatusBackground")
+    val animatedScale by animateFloatAsState(if (confirmado) 1.025f else 1f, label = "doseConfirmationScale")
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().graphicsLayer { scaleX = animatedScale; scaleY = animatedScale },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = animatedContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
