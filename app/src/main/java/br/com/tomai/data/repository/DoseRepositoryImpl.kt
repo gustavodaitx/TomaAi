@@ -36,7 +36,7 @@ class DoseRepositoryImpl(
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         Log.e(TAG, "observarDosesDoDia: ${error.message}", error)
-                        trySend(emptyList())
+                        close(error)
                         return@addSnapshotListener
                     }
                     val lista = snapshot?.documents?.mapNotNull { doc ->
@@ -78,7 +78,7 @@ class DoseRepositoryImpl(
             if (usuarioId.isBlank()) {
                 return Result.failure(IllegalStateException("Usuário não identificado."))
             }
-            val batch = firestore.batch()
+            var batch = firestore.batch()
             var operacoes = 0
 
             medicamentos.filter { it.ativo }.forEach medicamentoLoop@ { medicamento ->
@@ -118,6 +118,11 @@ class DoseRepositoryImpl(
                         )
                         batch.set(docRef, meta, SetOptions.merge())
                         operacoes++
+                    }
+                    if (operacoes == 450) {
+                        batch.commit().await()
+                        batch = firestore.batch()
+                        operacoes = 0
                     }
                 }
             }

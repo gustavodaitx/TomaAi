@@ -19,7 +19,10 @@ function exigirLogin(context: functions.https.CallableContext): string {
 export const listarPlanos = functions.https.onCall(async (_data, context) => {
   exigirLogin(context);
   const snapshot = await db.collection("planos").where("ativo", "==", true).get();
-  if (!snapshot.empty) return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const existentes = new Map(snapshot.docs.map((doc) => [doc.id, { id: doc.id, ...doc.data() }]));
+  const idsEsperados = ["QUINZENAL", "MENSAL"] as const;
+  const faltantes = idsEsperados.filter((id) => !existentes.has(id));
+  if (faltantes.length === 0) return idsEsperados.map((id) => existentes.get(id));
 
   let configurados;
   try {
@@ -28,9 +31,12 @@ export const listarPlanos = functions.https.onCall(async (_data, context) => {
     throw new functions.https.HttpsError("failed-precondition", error instanceof Error ? error.message : "Configure os preços dos planos.");
   }
   const batch = db.batch();
-  configurados.forEach((plano) => batch.set(db.collection("planos").doc(plano.id), plano, { merge: true }));
+  configurados.filter((plano) => faltantes.includes(plano.id)).forEach((plano) => {
+    batch.set(db.collection("planos").doc(plano.id), plano, { merge: true });
+    existentes.set(plano.id, plano);
+  });
   await batch.commit();
-  return configurados;
+  return idsEsperados.map((id) => existentes.get(id));
 });
 
 export const criarClienteAsaas = functions.https.onCall(async (_data, context) => {

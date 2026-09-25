@@ -8,6 +8,7 @@ import br.com.tomai.data.repository.MedicamentoRepository
 import br.com.tomai.data.repository.MedicamentoRepositoryImpl
 import br.com.tomai.model.Dose
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,32 +60,50 @@ class DoseViewModel(
         }
 
         medicamentosJob = viewModelScope.launch {
-            medicamentoRepository.observarMedicamentos(usuarioId).collect { medicamentos ->
+            try {
+                medicamentoRepository.observarMedicamentos(usuarioId).collect { medicamentos ->
                 _uiState.update { it.copy(isSincronizandoAgenda = true) }
-                doseRepository.garantirAgendaDiaria(
-                    usuarioId = usuarioId,
-                    medicamentos = medicamentos,
-                    dataAgenda = dataHoje
-                ).onFailure { falha ->
-                    _uiState.update {
-                        it.copy(
-                            isSincronizandoAgenda = false,
-                            erro = falha.message
-                        )
+                try {
+                    doseRepository.garantirAgendaDiaria(
+                        usuarioId = usuarioId,
+                        medicamentos = medicamentos,
+                        dataAgenda = dataHoje
+                    ).onFailure { falha ->
+                        _uiState.update { it.copy(erro = falha.message) }
                     }
-                }.onSuccess {
+                } catch (cancelamento: CancellationException) {
+                    throw cancelamento
+                } catch (falha: Exception) {
+                    _uiState.update { it.copy(erro = falha.localizedMessage ?: "Não foi possível sincronizar a agenda.") }
+                } finally {
                     _uiState.update { it.copy(isSincronizandoAgenda = false) }
+                }
+            }
+            } catch (cancelamento: CancellationException) {
+                throw cancelamento
+            } catch (falha: Exception) {
+                _uiState.update {
+                    it.copy(isLoading = false, isSincronizandoAgenda = false,
+                        erro = falha.localizedMessage ?: "Não foi possível carregar os medicamentos.")
                 }
             }
         }
 
         dosesJob = viewModelScope.launch {
-            doseRepository.observarDosesDoDia(usuarioId, dataHoje).collect { doses ->
+            try {
+                doseRepository.observarDosesDoDia(usuarioId, dataHoje).collect { doses ->
                 _uiState.update {
                     it.copy(
                         doses = doses,
                         isLoading = false
                     )
+                }
+            }
+            } catch (cancelamento: CancellationException) {
+                throw cancelamento
+            } catch (falha: Exception) {
+                _uiState.update {
+                    it.copy(isLoading = false, erro = falha.localizedMessage ?: "Não foi possível carregar as doses.")
                 }
             }
         }

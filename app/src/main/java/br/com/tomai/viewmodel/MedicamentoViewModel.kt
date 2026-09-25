@@ -7,6 +7,7 @@ import br.com.tomai.data.repository.MedicamentoRepositoryImpl
 import br.com.tomai.model.HorarioMedicamento
 import br.com.tomai.model.Medicamento
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,12 +33,17 @@ class MedicamentoViewModel(
         _uiState.update { it.copy(usuarioId = usuarioId, isLoadingLista = true, erro = null) }
 
         observacaoJob = viewModelScope.launch {
-            repository.observarMedicamentos(usuarioId).collect { lista ->
+            try {
+                repository.observarMedicamentos(usuarioId).collect { lista ->
+                    _uiState.update {
+                        it.copy(medicamentos = lista, isLoadingLista = false)
+                    }
+                }
+            } catch (cancelamento: CancellationException) {
+                throw cancelamento
+            } catch (falha: Exception) {
                 _uiState.update {
-                    it.copy(
-                        medicamentos = lista,
-                        isLoadingLista = false
-                    )
+                    it.copy(isLoadingLista = false, erro = falha.localizedMessage ?: "Não foi possível carregar os medicamentos.")
                 }
             }
         }
@@ -180,25 +186,31 @@ class MedicamentoViewModel(
 
         _uiState.update { it.copy(isLoadingSalvar = true, erro = null) }
         viewModelScope.launch {
-            repository.salvar(medicamento).fold(
-                onSuccess = {
+            try {
+                repository.salvar(medicamento).fold(
+                    onSuccess = {
                     _uiState.update {
                         it.copy(
-                            isLoadingSalvar = false,
                             sucessoMensagem = "Medicamento salvo com sucesso."
                         )
                     }
                     onSucesso()
-                },
-                onFailure = { falha ->
+                    },
+                    onFailure = { falha ->
                     _uiState.update {
                         it.copy(
-                            isLoadingSalvar = false,
                             erro = falha.message
                         )
                     }
+                    }
+                )
+            } catch (cancelamento: CancellationException) {
+                throw cancelamento
+            } catch (falha: Exception) {
+                _uiState.update { it.copy(erro = falha.localizedMessage ?: "Não foi possível salvar o medicamento.") }
+            } finally {
+                _uiState.update { it.copy(isLoadingSalvar = false) }
                 }
-            )
         }
     }
 

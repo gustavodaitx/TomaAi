@@ -34,7 +34,7 @@ class MedicamentoRepositoryImpl(
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "observarMedicamentos: ${error.message}", error)
-                    trySend(emptyList())
+                    close(error)
                     return@addSnapshotListener
                 }
                 val lista = snapshot?.documents?.mapNotNull { doc ->

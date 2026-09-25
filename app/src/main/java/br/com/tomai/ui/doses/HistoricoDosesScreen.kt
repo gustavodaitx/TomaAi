@@ -63,7 +63,7 @@ fun HistoricoDosesScreen(usuarioId: String, viewModel: DoseViewModel, onVoltar: 
     var medicamentoFiltro by remember { mutableStateOf("Todos") }
     var menuMedicamentosAberto by remember { mutableStateOf(false) }
     var doseSelecionada by remember { mutableStateOf<Dose?>(null) }
-    val hoje = LocalDate.now()
+    val hoje = LocalDate.parse(Dose.dataHoje())
     val formatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     LaunchedEffect(usuarioId, periodo) {
