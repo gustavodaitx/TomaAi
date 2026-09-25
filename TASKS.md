@@ -1,17 +1,23 @@
----
-
-### 2. `TASKS.md`
-
-```markdown
 # TASKS.md — Backlog Modularizado do Projeto TomaAí
 
 > **Estratégia de Execução:** Tarefas quebradas em escopos reduzidos para otimizar consumo de tokens e viabilizar revisões contínuas por commit.
 
 ## 🔐 Módulo 1: Autenticação & Perfil de Usuário
-- [ ] **T1.1 — Configuração Base do Firebase Auth & Model `Usuario`**
+- [x] **T1.1 — Configuração Base do Firebase Auth & Model `Usuario`**
   - *Aceite:* Model Kotlin `Usuario`, ViewModel e Repository de login/cadastro salvando no Firestore (`/usuarios/{uid}`).
-- [ ] **T1.2 — Interface Compose de Login, Cadastro e Recuperação de Senha**
+  - *Status:* ✅ **Concluído**
+    - Modelo `Usuario.kt` com suporte a Firestore (`id`, `nome`, `email`, `perfil`, `ativo`, `criadoEm`, `asaasCustomerId`, `responsavelPadraoId`).
+    - Contrato `AuthRepository` e implementação `AuthRepositoryImpl` com login, cadastro, recuperação de senha, persistência em `/usuarios/{uid}` e tratamento de erros Firebase em PT-BR.
+    - `AuthViewModel` e `AuthUiState` gerenciando estado reativo (`StateFlow`), sessão ativa e validações de formulário.
+- [x] **T1.2 — Interface Compose de Login, Cadastro e Recuperação de Senha**
   - *Aceite:* Telas funcionais com tratamento de erros (ex: senha fraca, e-mail já cadastrado) e validação de campos.
+  - *Status:* ✅ **Concluído**
+    - `LoginScreen.kt`: Campos de e-mail e senha com toggle de visibilidade, validações, feedback de erro/carregamento e atalhos para cadastro e recuperação.
+    - `CadastroScreen.kt`: Cadastro completo com validação de nome, formato de e-mail, força mínima da senha (6 caracteres) e confirmação de senha idêntica.
+    - `RecuperarSenhaScreen.kt`: Fluxo de envio de e-mail de redefinição de senha com feedback de sucesso/erro.
+    - `HomeScreen.kt`: Tela inicial logada exibindo dados do perfil sincronizados com o Firestore e botão de logout.
+    - `NavGraph.kt` e `MainActivity.kt`: Navegação desacoplada via Navigation Compose com tema Material 3 médico/saúde (`TomaAiTheme`).
+    - Testes unitários com `AuthViewModelTest.kt` validando todas as regras e fluxos com sucesso (`./gradlew testDebugUnitTest` e `./gradlew assembleDebug` aprovados).
 
 ## 💊 Módulo 2: Domínio de Medicamentos & Horários
 - [ ] **T2.1 — CRUD de Medicamentos (`MedicamentoRepository`)**

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "123456789000",
+    "project_id": "tomai-project",
+    "storage_bucket": "tomai-project.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789000:android:abcdef1234567890",
+        "android_client_info": {
+          "package_name": "br.com.tomai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyMockKeyForDevelopmentOnly123456"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
