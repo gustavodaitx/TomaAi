@@ -50,6 +50,9 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val usuario = uiState.usuario
+    val uidExibicao = usuario?.id?.ifBlank { viewModel.obterUidAutenticado() }
+        ?: viewModel.obterUidAutenticado()
+        ?: "N/D"
 
     Scaffold(
         topBar = {
@@ -195,10 +198,11 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "UID Firestore: ${usuario?.id ?: "N/D"}\nSessão sincronizada em tempo real com /usuarios/{uid}.",
+                        text = "UID Firestore: $uidExibicao\nSessão sincronizada em tempo real com /usuarios/{uid}.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+
                 }
             }
 

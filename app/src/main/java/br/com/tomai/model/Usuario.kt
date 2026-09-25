@@ -1,8 +1,10 @@
 package br.com.tomai.model
 
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.IgnoreExtraProperties
 import com.google.firebase.firestore.PropertyName
+import com.google.firebase.firestore.ServerTimestamp
 
 /**
  * Representa o usuário do sistema TomaAí.
@@ -21,7 +23,8 @@ data class Usuario(
 
     val ativo: Boolean = true,
 
-    val criadoEm: Long = System.currentTimeMillis(),
+    @ServerTimestamp
+    val criadoEm: Timestamp? = Timestamp.now(),
 
     @get:PropertyName("asaasCustomerId")
     @set:PropertyName("asaasCustomerId")
@@ -44,9 +47,10 @@ data class Usuario(
             "email" to email,
             "perfil" to perfil,
             "ativo" to ativo,
-            "criadoEm" to criadoEm,
+            "criadoEm" to (criadoEm ?: Timestamp.now()),
             "asaasCustomerId" to asaasCustomerId,
             "responsavelPadraoId" to responsavelPadraoId
         )
     }
 }
+

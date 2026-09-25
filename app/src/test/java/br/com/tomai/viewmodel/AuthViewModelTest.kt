@@ -231,4 +231,9 @@ class FakeAuthRepository : AuthRepository {
         _usuarioAtualFlow.value = usuario
         return Result.success(Unit)
     }
+
+    override fun observarPerfil(uid: String): Flow<Usuario?> {
+        return _usuarioAtualFlow
+    }
 }
+

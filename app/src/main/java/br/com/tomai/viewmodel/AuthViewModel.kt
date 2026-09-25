@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.tomai.data.repository.AuthRepository
 import br.com.tomai.data.repository.AuthRepositoryImpl
+import br.com.tomai.model.Usuario
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +19,12 @@ class AuthViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        AuthUiState(estaAutenticado = authRepository.estaAutenticado())
+        AuthUiState(
+            estaAutenticado = authRepository.estaAutenticado(),
+            usuario = authRepository.obterUsuarioAtualId()?.let { uid ->
+                Usuario(id = uid, perfil = Usuario.PERFIL_PACIENTE)
+            }
+        )
     )
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
@@ -28,18 +34,27 @@ class AuthViewModel(
         observarUsuarioAtual()
     }
 
+    fun obterUidAutenticado(): String? {
+        return authRepository.obterUsuarioAtualId()
+    }
+
     private fun observarUsuarioAtual() {
         viewModelScope.launch {
             authRepository.usuarioAtualFlow.collect { usuario ->
                 _uiState.update { estadoAtual ->
                     estadoAtual.copy(
-                        usuario = usuario,
-                        estaAutenticado = usuario != null
+                        usuario = usuario ?: if (authRepository.estaAutenticado()) {
+                            authRepository.obterUsuarioAtualId()?.let { uid ->
+                                Usuario(id = uid, perfil = Usuario.PERFIL_PACIENTE)
+                            }
+                        } else null,
+                        estaAutenticado = usuario != null || authRepository.estaAutenticado()
                     )
                 }
             }
         }
     }
+
 
     fun login(email: String, senha: String, onSucesso: () -> Unit = {}) {
         val erroValidacao = validarCamposLogin(email, senha)

@@ -24,4 +24,7 @@ interface AuthRepository {
     suspend fun buscarPerfil(uid: String): Result<Usuario?>
 
     suspend fun salvarPerfil(usuario: Usuario): Result<Unit>
+
+    fun observarPerfil(uid: String): Flow<Usuario?>
 }
+

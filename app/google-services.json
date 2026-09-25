@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "123456789000",
-    "project_id": "tomai-project",
-    "storage_bucket": "tomai-project.appspot.com"
+    "project_number": "387833094529",
+    "project_id": "tomai-ede43",
+    "storage_bucket": "tomai-ede43.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789000:android:abcdef1234567890",
+        "mobilesdk_app_id": "1:387833094529:android:c82dbef83d0ea354c1c880",
         "android_client_info": {
           "package_name": "br.com.tomai"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyMockKeyForDevelopmentOnly123456"
+          "current_key": "AIzaSyAD0mEpesaEugEwsqJYN77oAk4bi1YQHBc"
         }
       ],
       "services": {
