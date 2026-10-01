@@ -1,14 +1,17 @@
 package br.com.tomai.viewmodel
 
 import br.com.tomai.data.repository.AuthRepository
+import br.com.tomai.data.repository.AuthRepositoryException
 import br.com.tomai.model.Usuario
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -91,6 +94,7 @@ class AuthViewModelTest {
     fun cadastrar_comNomeCurto_deveRetornarErro() = runTest {
         viewModel.cadastrar(
             nome = "A",
+            telefone = "11999999999",
             email = "teste@tomai.com",
             senha = "123456",
             confirmacaoSenha = "123456"
@@ -101,9 +105,23 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun cadastrar_comTelefoneInvalido_deveRetornarErro() = runTest {
+        viewModel.cadastrar(
+            nome = "Maria Silva",
+            telefone = "123",
+            email = "maria@tomai.com",
+            senha = "123456",
+            confirmacaoSenha = "123456"
+        )
+
+        assertEquals("Informe um telefone válido com DDD.", viewModel.uiState.value.erro)
+    }
+
+    @Test
     fun cadastrar_comSenhasDiferentes_deveRetornarErroDeIncompatibilidade() = runTest {
         viewModel.cadastrar(
             nome = "Maria Silva",
+            telefone = "11999999999",
             email = "maria@tomai.com",
             senha = "123456",
             confirmacaoSenha = "654321"
@@ -117,6 +135,7 @@ class AuthViewModelTest {
     fun cadastrar_comSenhaCurta_deveRetornarErroDeTamanhoMinimo() = runTest {
         viewModel.cadastrar(
             nome = "Maria Silva",
+            telefone = "11999999999",
             email = "maria@tomai.com",
             senha = "123",
             confirmacaoSenha = "123"
@@ -131,6 +150,7 @@ class AuthViewModelTest {
         var callbackSucessoChamado = false
         viewModel.cadastrar(
             nome = "Carlos Souza",
+            telefone = "11999999999",
             email = "carlos@tomai.com",
             senha = "senhaSegura123",
             confirmacaoSenha = "senhaSegura123",
@@ -146,6 +166,44 @@ class AuthViewModelTest {
         assertEquals("carlos@tomai.com", state.usuario?.email)
         assertEquals("Conta criada com sucesso!", state.sucessoMensagem)
         assertTrue(callbackSucessoChamado)
+    }
+
+    @Test
+    fun cadastrar_enquantoOutraTentativaEstaEmAndamento_deveIgnorarSegundaChamada() = runTest {
+        fakeRepository.bloqueioCadastro = CompletableDeferred()
+
+        viewModel.cadastrar("Maria Silva", "11999999999", "maria@tomai.com", "123456", "123456")
+        runCurrent()
+        assertTrue(viewModel.uiState.value.isLoading)
+
+        // O botao e o IME chamam o mesmo metodo; ambos ficam cobertos por esta segunda chamada.
+        viewModel.cadastrar("Maria Silva", "11999999999", "maria@tomai.com", "123456", "123456")
+        runCurrent()
+        assertEquals(1, fakeRepository.quantidadeChamadasCadastro)
+
+        fakeRepository.bloqueioCadastro?.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun cadastrar_comErroConhecido_deveExibirMensagemAmigavel() = runTest {
+        fakeRepository.falhaCadastro = AuthRepositoryException("Confira nome e telefone e tente novamente.")
+
+        viewModel.cadastrar("Maria Silva", "11999999999", "maria@tomai.com", "123456", "123456")
+        advanceUntilIdle()
+
+        assertEquals("Confira nome e telefone e tente novamente.", viewModel.uiState.value.erro)
+    }
+
+    @Test
+    fun cadastrar_comErroInesperado_naoDeveExibirDetalheTecnico() = runTest {
+        fakeRepository.falhaCadastro = IllegalStateException("INTERNAL: private backend details")
+
+        viewModel.cadastrar("Maria Silva", "11999999999", "maria@tomai.com", "123456", "123456")
+        advanceUntilIdle()
+
+        assertEquals("Não foi possível concluir o cadastro. Tente novamente.", viewModel.uiState.value.erro)
     }
 
     @Test
@@ -218,6 +276,9 @@ class FakeAuthRepository : AuthRepository {
 
     var deveFalhar: Boolean = false
     var mensagemFalha: String = "Erro simulado"
+    var falhaCadastro: Throwable? = null
+    var bloqueioCadastro: CompletableDeferred<Unit>? = null
+    var quantidadeChamadasCadastro: Int = 0
 
     override fun obterUsuarioAtualId(): String? = _usuarioAtualFlow.value?.id
 
@@ -237,11 +298,15 @@ class FakeAuthRepository : AuthRepository {
         return Result.success(user)
     }
 
-    override suspend fun cadastrar(nome: String, email: String, senha: String): Result<Usuario> {
+    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String): Result<Usuario> {
+        quantidadeChamadasCadastro += 1
+        bloqueioCadastro?.await()
+        falhaCadastro?.let { return Result.failure(it) }
         if (deveFalhar) return Result.failure(Exception(mensagemFalha))
         val user = Usuario(
             id = "mock_uid_cadastrado",
             nome = nome,
+            telefone = telefone,
             email = email,
             perfil = Usuario.PERFIL_PACIENTE,
             ativo = true

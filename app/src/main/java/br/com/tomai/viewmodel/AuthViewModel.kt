@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.tomai.data.repository.AuthRepository
+import br.com.tomai.data.repository.AuthRepositoryException
 import br.com.tomai.data.repository.AuthRepositoryImpl
 import br.com.tomai.model.Usuario
 import kotlinx.coroutines.Job
@@ -130,7 +131,7 @@ class AuthViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            erro = falha.message ?: "Falha ao realizar login."
+                            erro = mensagemFalhaSegura(falha, "Falha ao realizar login.")
                         )
                     }
                 }
@@ -140,12 +141,15 @@ class AuthViewModel(
 
     fun cadastrar(
         nome: String,
+        telefone: String,
         email: String,
         senha: String,
         confirmacaoSenha: String,
         onSucesso: () -> Unit = {}
     ) {
-        val erroValidacao = validarCamposCadastro(nome, email, senha, confirmacaoSenha)
+        if (_uiState.value.isLoading) return
+
+        val erroValidacao = validarCamposCadastro(nome, telefone, email, senha, confirmacaoSenha)
         if (erroValidacao != null) {
             _uiState.update { it.copy(erro = erroValidacao) }
             return
@@ -155,7 +159,7 @@ class AuthViewModel(
 
         viewModelScope.launch {
             Log.d(TAG, "cadastrar: Disparando cadastro para $email")
-            val resultado = authRepository.cadastrar(nome = nome, email = email, senha = senha)
+            val resultado = authRepository.cadastrar(nome = nome.trim(), telefone = telefone.trim(), email = email.trim(), senha = senha)
             resultado.fold(
                 onSuccess = { usuario ->
                     Log.d(TAG, "cadastrar: Sucesso para UID: ${usuario.id}")
@@ -173,11 +177,11 @@ class AuthViewModel(
                     onSucesso()
                 },
                 onFailure = { falha ->
-                    Log.e(TAG, "cadastrar: Falha ao cadastrar: ${falha.message}")
+                    Log.e(TAG, "cadastrar: Falha no fluxo de cadastro.")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            erro = falha.message ?: "Falha ao cadastrar usuário."
+                            erro = mensagemFalhaSegura(falha, "Não foi possível concluir o cadastro. Tente novamente.")
                         )
                     }
                 }
@@ -209,7 +213,7 @@ class AuthViewModel(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            erro = falha.message ?: "Falha ao solicitar recuperação de senha."
+                            erro = mensagemFalhaSegura(falha, "Falha ao solicitar recuperação de senha.")
                         )
                     }
                 }
@@ -239,6 +243,9 @@ class AuthViewModel(
         _uiState.update { it.copy(erro = null, sucessoMensagem = null) }
     }
 
+    private fun mensagemFalhaSegura(falha: Throwable, fallback: String): String =
+        (falha as? AuthRepositoryException)?.mensagemUsuario ?: fallback
+
     private fun validarCamposLogin(email: String, senha: String): String? {
         if (email.isBlank()) {
             return "O e-mail é obrigatório."
@@ -254,12 +261,16 @@ class AuthViewModel(
 
     private fun validarCamposCadastro(
         nome: String,
+        telefone: String,
         email: String,
         senha: String,
         confirmacaoSenha: String
     ): String? {
         if (nome.isBlank() || nome.trim().length < 2) {
             return "O nome deve conter pelo menos 2 caracteres."
+        }
+        if (telefone.filter(Char::isDigit).length < 10) {
+            return "Informe um telefone válido com DDD."
         }
         if (email.isBlank()) {
             return "O e-mail é obrigatório."

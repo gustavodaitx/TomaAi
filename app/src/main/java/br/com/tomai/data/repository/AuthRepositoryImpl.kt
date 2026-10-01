@@ -14,6 +14,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.functions.FirebaseFunctions
 import java.util.Date
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +27,8 @@ import kotlinx.coroutines.tasks.await
  */
 class AuthRepositoryImpl(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance()
 ) : AuthRepository {
 
     companion object {
@@ -234,53 +236,84 @@ class AuthRepositoryImpl(
             Result.success(usuario)
         } catch (e: Exception) {
             Log.e(TAG, "login: Falha durante o processo de login: ${e.message}", e)
-            Result.failure(Exception(mapearMensagemErro(e)))
+            Result.failure(AuthRepositoryException(mapearMensagemErro(e)))
         }
     }
 
-    override suspend fun cadastrar(nome: String, email: String, senha: String): Result<Usuario> {
+    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String): Result<Usuario> {
+        var usuarioAutenticado = auth.currentUser
         return try {
-            Log.d(TAG, "cadastrar: Iniciando criação de conta no Firebase Auth para: ${email.trim()}")
-            val authResult = auth.createUserWithEmailAndPassword(email.trim(), senha).await()
-            val firebaseUser = auth.currentUser ?: authResult.user
-                ?: return Result.failure(Exception("Falha ao criar usuário no Firebase Auth."))
-
-            val uid = firebaseUser.uid
-            Log.d(TAG, "cadastrar: Conta criada no Auth com sucesso! UID: $uid")
-
-            // Atualiza displayName no Firebase Auth
-            val profileUpdates = UserProfileChangeRequest.Builder()
-                .setDisplayName(nome.trim())
-                .build()
-            try {
-                firebaseUser.updateProfile(profileUpdates).await()
-                Log.d(TAG, "cadastrar: DisplayName atualizado no Auth com sucesso.")
-            } catch (e: Exception) {
-                Log.e(TAG, "cadastrar: Aviso: Falha ao atualizar displayName no Auth: ${e.message}", e)
+            if (usuarioAutenticado != null && !usuarioAutenticado.email.equals(email.trim(), ignoreCase = true)) {
+                return Result.failure(AuthRepositoryException("Existe uma sessao ativa com outro e-mail. Encerre-a antes de cadastrar."))
             }
 
-            val novoUsuario = Usuario(
-                id = uid,
-                nome = nome.trim(),
-                email = email.trim(),
-                perfil = Usuario.PERFIL_PACIENTE,
-                ativo = true,
-                criadoEm = Timestamp.now()
+            if (usuarioAutenticado == null) {
+                usuarioAutenticado = try {
+                    val authResult = auth.createUserWithEmailAndPassword(email.trim(), senha).await()
+                    auth.currentUser ?: authResult.user
+                } catch (_: FirebaseAuthUserCollisionException) {
+                    val loginResult = auth.signInWithEmailAndPassword(email.trim(), senha).await()
+                    auth.currentUser ?: loginResult.user
+                }
+            }
+            val firebaseUser = usuarioAutenticado
+                ?: throw IllegalStateException("Nao foi possivel confirmar a conta no Firebase Authentication.")
+
+            if (firebaseUser.displayName.isNullOrBlank()) {
+                val profileUpdates = UserProfileChangeRequest.Builder()
+                    .setDisplayName(nome.trim())
+                    .build()
+                runCatching { firebaseUser.updateProfile(profileUpdates).await() }
+                    .onFailure { Log.w(TAG, "cadastrar: Nao foi possivel atualizar o nome de exibicao.", it) }
+            }
+
+            val resultadoFuncao = functions
+                .getHttpsCallable("criarPerfilPaciente")
+                .call(mapOf("nome" to nome.trim(), "telefone" to telefone.trim()))
+                .await()
+            val dadosPerfil = resultadoFuncao.data as? Map<*, *>
+                ?: throw IllegalStateException("Resposta invalida ao concluir cadastro.")
+            val codigoVinculo = dadosPerfil["codigoVinculo"] as? String
+            val nomeSalvo = dadosPerfil["nome"] as? String
+            val telefoneSalvo = dadosPerfil["telefone"] as? String
+            val emailSalvo = dadosPerfil["email"] as? String
+            if (codigoVinculo.isNullOrBlank() || nomeSalvo == null || telefoneSalvo == null || emailSalvo == null ||
+                dadosPerfil["perfil"] != Usuario.PERFIL_PACIENTE) {
+                throw IllegalStateException("Resposta invalida ao concluir cadastro.")
+            }
+
+            Result.success(
+                Usuario(
+                    id = firebaseUser.uid,
+                    nome = nomeSalvo,
+                    telefone = telefoneSalvo,
+                    email = emailSalvo,
+                    perfil = Usuario.PERFIL_PACIENTE,
+                    ativo = true,
+                    criadoEm = Timestamp.now(),
+                    codigoVinculo = codigoVinculo
+                )
             )
-
-            // Salva dados no Firestore em /usuarios/{uid} explicitamente utilizando SetOptions.merge()
-            Log.d(TAG, "cadastrar: Persistindo documento /usuarios/$uid no Firestore com SetOptions.merge()...")
-            val docRef = firestore.collection(COLECAO_USUARIOS).document(uid)
-            docRef.set(novoUsuario.toMap(), SetOptions.merge()).await()
-            Log.d(TAG, "cadastrar: Documento do usuário persistido com sucesso no Firestore: $uid")
-
-            Result.success(novoUsuario)
         } catch (e: Exception) {
-            Log.e(TAG, "cadastrar: Falha ao cadastrar usuário: ${e.message}", e)
-            Result.failure(Exception(mapearMensagemErro(e)))
+            Log.e(TAG, "cadastrar: Falha no fluxo de cadastro: ${e.message}", e)
+            val codigoFunction = (e as? com.google.firebase.functions.FirebaseFunctionsException)?.code
+            val mensagemDefinitiva = when (codigoFunction) {
+                com.google.firebase.functions.FirebaseFunctionsException.Code.INVALID_ARGUMENT ->
+                    "Confira nome e telefone e tente novamente."
+                com.google.firebase.functions.FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED ->
+                    "Nao foi possivel gerar o codigo agora. Tente novamente."
+                else -> null
+            }
+            val pendente = usuarioAutenticado != null || auth.currentUser != null
+            val mensagem = mensagemDefinitiva
+                ?: if (pendente) {
+                    "Sua conta foi criada, mas nao foi possivel confirmar o cadastro. Tente novamente."
+                } else {
+                    mapearMensagemErro(e)
+                }
+            Result.failure(AuthRepositoryException(mensagem, cadastroPendente = pendente))
         }
     }
-
     override suspend fun recuperarSenha(email: String): Result<Unit> {
         return try {
             Log.d(TAG, "recuperarSenha: Enviando e-mail de recuperação para: ${email.trim()}")
@@ -289,7 +322,7 @@ class AuthRepositoryImpl(
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "recuperarSenha: Erro ao enviar recuperação de senha: ${e.message}", e)
-            Result.failure(Exception(mapearMensagemErro(e)))
+            Result.failure(AuthRepositoryException(mapearMensagemErro(e)))
         }
     }
 
@@ -321,7 +354,7 @@ class AuthRepositoryImpl(
             }
         } catch (e: Exception) {
             Log.e(TAG, "buscarPerfil: Erro ao buscar perfil para UID $uid: ${e.message}", e)
-            Result.failure(Exception(mapearMensagemErro(e)))
+            Result.failure(AuthRepositoryException(mapearMensagemErro(e)))
         }
     }
 
@@ -340,7 +373,7 @@ class AuthRepositoryImpl(
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "salvarPerfil: Erro ao salvar perfil: ${e.message}", e)
-            Result.failure(Exception(mapearMensagemErro(e)))
+            Result.failure(AuthRepositoryException(mapearMensagemErro(e)))
         }
     }
 
@@ -399,36 +432,12 @@ class AuthRepositoryImpl(
     ): Usuario {
         return try {
             val criadoEm = extrairTimestampSeguro(snapshot, "criadoEm")
-            val nome = (snapshot.get("nome") as? String)
-                ?: defaultNome
-                ?: "Usuário TomaAí"
-
-            val email = (snapshot.get("email") as? String)
-                ?: defaultEmail
-                ?: ""
-
-            val perfil = (snapshot.get("perfil") as? String)
-                ?: Usuario.PERFIL_PACIENTE
-
-            val ativo = when (val valorAtivo = snapshot.get("ativo")) {
-                is Boolean -> valorAtivo
-                is Number -> valorAtivo.toInt() != 0
-                is String -> valorAtivo.toBoolean()
-                else -> true
-            }
-
-            val asaasCustomerId = snapshot.get("asaasCustomerId") as? String
-            val responsavelPadraoId = snapshot.get("responsavelPadraoId") as? String
-
-            Usuario(
-                id = uid,
-                nome = nome,
-                email = email,
-                perfil = perfil,
-                ativo = ativo,
-                criadoEm = criadoEm,
-                asaasCustomerId = asaasCustomerId,
-                responsavelPadraoId = responsavelPadraoId
+            Usuario.fromFirestoreData(
+                uid = uid,
+                data = snapshot.data ?: emptyMap(),
+                defaultEmail = defaultEmail,
+                defaultNome = defaultNome,
+                criadoEm = criadoEm
             )
         } catch (e: Exception) {
             Log.e(TAG, "criarUsuarioDeSnapshot: Erro crítico ao construir Usuario: ${e.message}", e)
@@ -502,11 +511,14 @@ class AuthRepositoryImpl(
             is FirebaseAuthInvalidUserException -> {
                 "Usuário não encontrado ou conta desativada."
             }
+            is com.google.firebase.functions.FirebaseFunctionsException -> {
+                "Nao foi possivel concluir o cadastro agora. Verifique sua conexao e tente novamente."
+            }
             is FirebaseNetworkException -> {
                 "Sem conexão com a internet. Verifique sua rede e tente novamente."
             }
             else -> {
-                exception.localizedMessage ?: "Ocorreu um erro inesperado. Tente novamente mais tarde."
+                "Nao foi possivel concluir a operacao. Tente novamente."
             }
         }
     }

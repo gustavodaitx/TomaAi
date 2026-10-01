@@ -17,6 +17,8 @@ data class Usuario(
 
     val nome: String = "",
 
+    val telefone: String = "",
+
     val email: String = "",
 
     val perfil: String = PERFIL_PACIENTE,
@@ -32,7 +34,9 @@ data class Usuario(
 
     @get:PropertyName("responsavelPadraoId")
     @set:PropertyName("responsavelPadraoId")
-    var responsavelPadraoId: String? = null
+    var responsavelPadraoId: String? = null,
+
+    val codigoVinculo: String? = null
 ) {
     companion object {
         const val PERFIL_PACIENTE = "PACIENTE"
@@ -53,6 +57,33 @@ data class Usuario(
                 criadoEm = Timestamp.now()
             )
         }
+
+        fun fromFirestoreData(
+            uid: String,
+            data: Map<String, Any?>,
+            defaultEmail: String? = null,
+            defaultNome: String? = null,
+            criadoEm: Timestamp? = null
+        ): Usuario {
+            val ativo = when (val valor = data["ativo"]) {
+                is Boolean -> valor
+                is Number -> valor.toInt() != 0
+                is String -> valor.toBoolean()
+                else -> true
+            }
+            return Usuario(
+                id = uid,
+                nome = data["nome"] as? String ?: defaultNome ?: "Usuário TomaAí",
+                telefone = data["telefone"] as? String ?: "",
+                email = data["email"] as? String ?: defaultEmail ?: "",
+                perfil = data["perfil"] as? String ?: PERFIL_PACIENTE,
+                ativo = ativo,
+                criadoEm = criadoEm ?: Timestamp.now(),
+                asaasCustomerId = data["asaasCustomerId"] as? String,
+                responsavelPadraoId = data["responsavelPadraoId"] as? String,
+                codigoVinculo = data["codigoVinculo"] as? String
+            )
+        }
     }
 
     fun toMap(): Map<String, Any?> {
@@ -64,6 +95,12 @@ data class Usuario(
             "ativo" to ativo,
             "criadoEm" to (criadoEm ?: Timestamp.now())
         )
+        if (telefone.isNotBlank()) {
+            map["telefone"] = telefone
+        }
+        if (codigoVinculo != null) {
+            map["codigoVinculo"] = codigoVinculo
+        }
         if (asaasCustomerId != null) {
             map["asaasCustomerId"] = asaasCustomerId
         }

@@ -3,6 +3,11 @@ package br.com.tomai.data.repository
 import br.com.tomai.model.Usuario
 import kotlinx.coroutines.flow.Flow
 
+class AuthRepositoryException(
+    val mensagemUsuario: String,
+    val cadastroPendente: Boolean = false
+) : Exception(mensagemUsuario)
+
 /**
  * Interface do repositório de autenticação e gerenciamento de perfil de usuário.
  */
@@ -15,7 +20,7 @@ interface AuthRepository {
 
     suspend fun login(email: String, senha: String): Result<Usuario>
 
-    suspend fun cadastrar(nome: String, email: String, senha: String): Result<Usuario>
+    suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String): Result<Usuario>
 
     suspend fun recuperarSenha(email: String): Result<Unit>
 

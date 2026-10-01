@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import { criarPerfilPaciente as criarPerfilPacienteNoFirestore, ErroCadastroPaciente, obterIdentidadeAutenticada } from "./usuarios/cadastroPaciente";
 import { criarClienteNoAsaas } from "./asaas/clientes";
 import { cancelarAssinaturaNoAsaas, criarAssinaturaNoAsaas } from "./asaas/assinaturas";
 import { obterPixDaCobranca, removerCobrancaPendente, sincronizarCobrancasNoAsaas } from "./asaas/cobrancas";
@@ -15,6 +16,19 @@ function exigirLogin(context: functions.https.CallableContext): string {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Faça login para continuar.");
   return context.auth.uid;
 }
+
+export const criarPerfilPaciente = functions.https.onCall(async (data, context) => {
+  try {
+    const identidade = obterIdentidadeAutenticada(context.auth);
+    return await criarPerfilPacienteNoFirestore(identidade.uid, identidade.email, data, db);
+  } catch (error) {
+    if (error instanceof ErroCadastroPaciente) {
+      throw new functions.https.HttpsError(error.codigo, error.message);
+    }
+    console.error("Falha inesperada ao criar perfil de paciente.", error);
+    throw new functions.https.HttpsError("internal", "Não foi possível concluir o cadastro. Tente novamente.");
+  }
+});
 
 export const listarPlanos = functions.https.onCall(async (_data, context) => {
   exigirLogin(context);

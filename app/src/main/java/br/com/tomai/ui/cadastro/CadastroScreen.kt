@@ -23,10 +23,12 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,15 +78,33 @@ fun CadastroScreen(
 
     var nome by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
+    var telefone by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
     var confirmacaoSenha by remember { mutableStateOf("") }
     var senhaVisivel by remember { mutableStateOf(false) }
     var confirmacaoVisivel by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.estaAutenticado) {
-        if (uiState.estaAutenticado) {
-            onCadastroSucesso()
-        }
+    val codigoVinculo = uiState.usuario?.codigoVinculo
+    if (uiState.estaAutenticado && !codigoVinculo.isNullOrBlank()) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Cadastro concluído") },
+            text = {
+                Column {
+                    Text("Compartilhe este código com sua Pessoa de Confiança para vincular as contas:")
+                    Text(
+                        text = codigoVinculo,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onCadastroSucesso) { Text("Continuar") }
+            }
+        )
     }
 
     LaunchedEffect(uiState.erro) {
@@ -199,6 +219,25 @@ fun CadastroScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            AppTextField(
+                value = telefone,
+                onValueChange = { telefone = it },
+                label = "Telefone",
+                placeholder = "(11) 99999-9999",
+                leadingIcon = {
+                    Icon(Icons.Default.Phone, contentDescription = "Telefone", tint = MaterialTheme.colorScheme.primary)
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Campo E-mail
             AppTextField(
                 value = email,
@@ -287,10 +326,10 @@ fun CadastroScreen(
                         focusManager.clearFocus()
                         viewModel.cadastrar(
                             nome = nome,
+                            telefone = telefone,
                             email = email,
                             senha = senha,
                             confirmacaoSenha = confirmacaoSenha,
-                            onSucesso = onCadastroSucesso
                         )
                     }
                 )
@@ -306,10 +345,10 @@ fun CadastroScreen(
                     focusManager.clearFocus()
                     viewModel.cadastrar(
                         nome = nome,
+                        telefone = telefone,
                         email = email,
                         senha = senha,
                         confirmacaoSenha = confirmacaoSenha,
-                        onSucesso = onCadastroSucesso
                     )
                 }
             )
