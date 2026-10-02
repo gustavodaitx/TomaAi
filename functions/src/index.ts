@@ -8,6 +8,7 @@ import { processarAsaasWebhook } from "./webhooks/asaasWebhook";
 import { verificarDosesNaoConfirmadas } from "./alerts/verificarDosesNaoConfirmadas";
 import { obterPlanosPadrao } from "./asaas/planos";
 import { gerarCobrancasQuinzenais } from "./asaas/gerarCobrancasQuinzenais";
+import { criarPerfilPessoaDeConfianca as criarPerfilPessoaDeConfiancaNoFirestore, ErroCadastroPessoaDeConfianca } from "./usuarios/cadastroPessoaDeConfianca";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -26,6 +27,17 @@ export const criarPerfilPaciente = functions.https.onCall(async (data, context) 
       throw new functions.https.HttpsError(error.codigo, error.message);
     }
     console.error("Falha inesperada ao criar perfil de paciente.", error);
+    throw new functions.https.HttpsError("internal", "Não foi possível concluir o cadastro. Tente novamente.");
+  }
+});
+
+export const criarPerfilPessoaDeConfianca = functions.https.onCall(async (data, context) => {
+  try {
+    const identidade = obterIdentidadeAutenticada(context.auth);
+    return await criarPerfilPessoaDeConfiancaNoFirestore(identidade.uid, identidade.email, data, db);
+  } catch (error) {
+    if (error instanceof ErroCadastroPessoaDeConfianca) throw new functions.https.HttpsError(error.codigo, error.message);
+    console.error("Falha inesperada ao criar perfil de pessoa de confiança.", error);
     throw new functions.https.HttpsError("internal", "Não foi possível concluir o cadastro. Tente novamente.");
   }
 });

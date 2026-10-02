@@ -20,7 +20,7 @@ interface AuthRepository {
 
     suspend fun login(email: String, senha: String): Result<Usuario>
 
-    suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String): Result<Usuario>
+    suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String? = null): Result<Usuario>
 
     suspend fun recuperarSenha(email: String): Result<Unit>
 

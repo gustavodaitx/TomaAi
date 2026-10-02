@@ -240,7 +240,7 @@ class AuthRepositoryImpl(
         }
     }
 
-    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String): Result<Usuario> {
+    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String?): Result<Usuario> {
         var usuarioAutenticado = auth.currentUser
         return try {
             if (usuarioAutenticado != null && !usuarioAutenticado.email.equals(email.trim(), ignoreCase = true)) {
@@ -267,18 +267,26 @@ class AuthRepositoryImpl(
                     .onFailure { Log.w(TAG, "cadastrar: Nao foi possivel atualizar o nome de exibicao.", it) }
             }
 
+            val pessoaDeConfianca = !codigoPaciente.isNullOrBlank()
             val resultadoFuncao = functions
-                .getHttpsCallable("criarPerfilPaciente")
-                .call(mapOf("nome" to nome.trim(), "telefone" to telefone.trim()))
+                .getHttpsCallable(if (pessoaDeConfianca) "criarPerfilPessoaDeConfianca" else "criarPerfilPaciente")
+                .call(buildMap {
+                    put("nome", nome.trim())
+                    put("telefone", telefone.trim())
+                    if (pessoaDeConfianca) put("codigoPaciente", codigoPaciente!!.trim().uppercase())
+                })
                 .await()
             val dadosPerfil = resultadoFuncao.data as? Map<*, *>
                 ?: throw IllegalStateException("Resposta invalida ao concluir cadastro.")
             val codigoVinculo = dadosPerfil["codigoVinculo"] as? String
+            val pacienteUid = dadosPerfil["pacienteUid"] as? String
             val nomeSalvo = dadosPerfil["nome"] as? String
             val telefoneSalvo = dadosPerfil["telefone"] as? String
             val emailSalvo = dadosPerfil["email"] as? String
-            if (codigoVinculo.isNullOrBlank() || nomeSalvo == null || telefoneSalvo == null || emailSalvo == null ||
-                dadosPerfil["perfil"] != Usuario.PERFIL_PACIENTE) {
+            val perfilEsperado = if (pessoaDeConfianca) Usuario.PERFIL_PESSOA_DE_CONFIANCA else Usuario.PERFIL_PACIENTE
+            if (nomeSalvo == null || telefoneSalvo == null || emailSalvo == null || dadosPerfil["perfil"] != perfilEsperado ||
+                (pessoaDeConfianca && (pacienteUid.isNullOrBlank() || codigoVinculo != null)) ||
+                (!pessoaDeConfianca && codigoVinculo.isNullOrBlank())) {
                 throw IllegalStateException("Resposta invalida ao concluir cadastro.")
             }
 
@@ -288,16 +296,20 @@ class AuthRepositoryImpl(
                     nome = nomeSalvo,
                     telefone = telefoneSalvo,
                     email = emailSalvo,
-                    perfil = Usuario.PERFIL_PACIENTE,
+                    perfil = perfilEsperado,
                     ativo = true,
                     criadoEm = Timestamp.now(),
-                    codigoVinculo = codigoVinculo
+                    codigoVinculo = codigoVinculo,
+                    pacienteUid = pacienteUid
                 )
             )
         } catch (e: Exception) {
             Log.e(TAG, "cadastrar: Falha no fluxo de cadastro: ${e.message}", e)
             val codigoFunction = (e as? com.google.firebase.functions.FirebaseFunctionsException)?.code
             val mensagemDefinitiva = when (codigoFunction) {
+                com.google.firebase.functions.FirebaseFunctionsException.Code.NOT_FOUND -> "Código do paciente inválido. Confira o código e tente novamente."
+                com.google.firebase.functions.FirebaseFunctionsException.Code.ALREADY_EXISTS -> "Este cadastro já está vinculado a um paciente."
+                com.google.firebase.functions.FirebaseFunctionsException.Code.FAILED_PRECONDITION -> "Não foi possível vincular a conta com este código."
                 com.google.firebase.functions.FirebaseFunctionsException.Code.INVALID_ARGUMENT ->
                     "Confira nome e telefone e tente novamente."
                 com.google.firebase.functions.FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED ->

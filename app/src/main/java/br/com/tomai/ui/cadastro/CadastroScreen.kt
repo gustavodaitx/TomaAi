@@ -38,6 +38,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -81,6 +82,8 @@ fun CadastroScreen(
     var telefone by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
     var confirmacaoSenha by remember { mutableStateOf("") }
+    var codigoPaciente by remember { mutableStateOf("") }
+    var cadastroPessoaDeConfianca by remember { mutableStateOf(false) }
     var senhaVisivel by remember { mutableStateOf(false) }
     var confirmacaoVisivel by remember { mutableStateOf(false) }
 
@@ -217,6 +220,28 @@ fun CadastroScreen(
                 )
             )
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                if (cadastroPessoaDeConfianca) {
+                    OutlinedButton(onClick = { cadastroPessoaDeConfianca = false }, modifier = Modifier.weight(1f)) { Text("Sou paciente") }
+                    TextButton(onClick = { cadastroPessoaDeConfianca = true }, modifier = Modifier.weight(1f)) { Text("Pessoa de confiança") }
+                } else {
+                    TextButton(onClick = { cadastroPessoaDeConfianca = false }, modifier = Modifier.weight(1f)) { Text("Sou paciente") }
+                    OutlinedButton(onClick = { cadastroPessoaDeConfianca = true }, modifier = Modifier.weight(1f)) { Text("Pessoa de confiança") }
+                }
+            }
+            if (cadastroPessoaDeConfianca) {
+                Spacer(modifier = Modifier.height(16.dp))
+                AppTextField(
+                    value = codigoPaciente,
+                    onValueChange = { codigoPaciente = it.uppercase() },
+                    label = "Código do paciente",
+                    placeholder = "TMA-ABC123",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
+                Text("Peça ao paciente o código exibido após o cadastro.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             AppTextField(
@@ -330,6 +355,7 @@ fun CadastroScreen(
                             email = email,
                             senha = senha,
                             confirmacaoSenha = confirmacaoSenha,
+                            codigoPaciente = codigoPaciente.takeIf { cadastroPessoaDeConfianca },
                         )
                     }
                 )
@@ -349,6 +375,7 @@ fun CadastroScreen(
                         email = email,
                         senha = senha,
                         confirmacaoSenha = confirmacaoSenha,
+                        codigoPaciente = codigoPaciente.takeIf { cadastroPessoaDeConfianca },
                     )
                 }
             )

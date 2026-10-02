@@ -145,11 +145,12 @@ class AuthViewModel(
         email: String,
         senha: String,
         confirmacaoSenha: String,
+        codigoPaciente: String? = null,
         onSucesso: () -> Unit = {}
     ) {
         if (_uiState.value.isLoading) return
 
-        val erroValidacao = validarCamposCadastro(nome, telefone, email, senha, confirmacaoSenha)
+        val erroValidacao = validarCamposCadastro(nome, telefone, email, senha, confirmacaoSenha, codigoPaciente)
         if (erroValidacao != null) {
             _uiState.update { it.copy(erro = erroValidacao) }
             return
@@ -159,7 +160,7 @@ class AuthViewModel(
 
         viewModelScope.launch {
             Log.d(TAG, "cadastrar: Disparando cadastro para $email")
-            val resultado = authRepository.cadastrar(nome = nome.trim(), telefone = telefone.trim(), email = email.trim(), senha = senha)
+            val resultado = authRepository.cadastrar(nome = nome.trim(), telefone = telefone.trim(), email = email.trim(), senha = senha, codigoPaciente = codigoPaciente?.trim()?.takeIf { it.isNotBlank() })
             resultado.fold(
                 onSuccess = { usuario ->
                     Log.d(TAG, "cadastrar: Sucesso para UID: ${usuario.id}")
@@ -264,7 +265,8 @@ class AuthViewModel(
         telefone: String,
         email: String,
         senha: String,
-        confirmacaoSenha: String
+        confirmacaoSenha: String,
+        codigoPaciente: String? = null
     ): String? {
         if (nome.isBlank() || nome.trim().length < 2) {
             return "O nome deve conter pelo menos 2 caracteres."
@@ -283,6 +285,9 @@ class AuthViewModel(
         }
         if (senha != confirmacaoSenha) {
             return "As senhas não coincidem."
+        }
+        if (!codigoPaciente.isNullOrBlank() && !Regex("^TMA-[A-Z2-9]{6}$").matches(codigoPaciente.trim().uppercase())) {
+            return "Informe um código de paciente válido (ex.: TMA-ABC123)."
         }
         return null
     }

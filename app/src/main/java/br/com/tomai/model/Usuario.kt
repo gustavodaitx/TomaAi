@@ -36,11 +36,13 @@ data class Usuario(
     @set:PropertyName("responsavelPadraoId")
     var responsavelPadraoId: String? = null,
 
-    val codigoVinculo: String? = null
+    val codigoVinculo: String? = null,
+    val pacienteUid: String? = null
 ) {
     companion object {
         const val PERFIL_PACIENTE = "PACIENTE"
         const val PERFIL_CUIDADOR = "CUIDADOR"
+        const val PERFIL_PESSOA_DE_CONFIANCA = "PESSOA_DE_CONFIANCA"
         const val PERFIL_ADMIN = "ADMIN"
 
         fun criarPadrao(
@@ -81,7 +83,8 @@ data class Usuario(
                 criadoEm = criadoEm ?: Timestamp.now(),
                 asaasCustomerId = data["asaasCustomerId"] as? String,
                 responsavelPadraoId = data["responsavelPadraoId"] as? String,
-                codigoVinculo = data["codigoVinculo"] as? String
+                codigoVinculo = data["codigoVinculo"] as? String,
+                pacienteUid = data["pacienteUid"] as? String
             )
         }
     }
@@ -101,6 +104,7 @@ data class Usuario(
         if (codigoVinculo != null) {
             map["codigoVinculo"] = codigoVinculo
         }
+        if (pacienteUid != null) map["pacienteUid"] = pacienteUid
         if (asaasCustomerId != null) {
             map["asaasCustomerId"] = asaasCustomerId
         }
