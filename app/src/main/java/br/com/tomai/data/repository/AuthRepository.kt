@@ -5,8 +5,9 @@ import kotlinx.coroutines.flow.Flow
 
 class AuthRepositoryException(
     val mensagemUsuario: String,
-    val cadastroPendente: Boolean = false
-) : Exception(mensagemUsuario)
+    val cadastroPendente: Boolean = false,
+    causa: Throwable? = null
+) : Exception(mensagemUsuario, causa)
 
 /**
  * Interface do repositório de autenticação e gerenciamento de perfil de usuário.
@@ -20,7 +21,14 @@ interface AuthRepository {
 
     suspend fun login(email: String, senha: String): Result<Usuario>
 
-    suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String? = null): Result<Usuario>
+    suspend fun cadastrar(
+        nome: String,
+        telefone: String,
+        email: String,
+        senha: String,
+        codigoPaciente: String? = null,
+        perfil: String = if (codigoPaciente.isNullOrBlank()) Usuario.PERFIL_PACIENTE else Usuario.PERFIL_PESSOA_DE_CONFIANCA
+    ): Result<Usuario>
 
     suspend fun garantirCodigoPaciente(uid: String): Result<String>
 
@@ -34,4 +42,3 @@ interface AuthRepository {
 
     fun observarPerfil(uid: String): Flow<Usuario?>
 }
-

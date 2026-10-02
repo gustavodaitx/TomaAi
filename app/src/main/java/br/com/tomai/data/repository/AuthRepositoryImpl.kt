@@ -89,20 +89,8 @@ class AuthRepositoryImpl(
                         )
                         trySend(usuario)
                     } else if (snapshot != null && !snapshot.exists()) {
-                        Log.d(TAG, "usuarioAtualFlow: Documento /usuarios/${user.uid} inexiste. Criando documento padrão com SetOptions.merge()...")
-                        val novoUsuario = Usuario.criarPadrao(
-                            uid = user.uid,
-                            email = user.email ?: "",
-                            nome = user.displayName
-                        )
-                        docRef.set(novoUsuario.toMap(), SetOptions.merge())
-                            .addOnSuccessListener {
-                                Log.d(TAG, "usuarioAtualFlow: Documento padrão criado com sucesso para UID: ${user.uid}")
-                            }
-                            .addOnFailureListener { e ->
-                                Log.e(TAG, "usuarioAtualFlow: Falha ao criar documento padrão para UID ${user.uid}: ${e.message}", e)
-                            }
-                        trySend(novoUsuario)
+                        Log.d(TAG, "usuarioAtualFlow: Documento /usuarios/${user.uid} ainda não existe.")
+                        trySend(null)
                     }
                 }
             }
@@ -150,20 +138,8 @@ class AuthRepositoryImpl(
                 val usuario = mapearDocumentoParaUsuario(snapshot, uid, auth.currentUser?.email, auth.currentUser?.displayName)
                 trySend(usuario)
             } else if (snapshot != null && !snapshot.exists()) {
-                Log.d(TAG, "observarPerfil: Documento não existe para UID: $uid. Criando documento padrão com SetOptions.merge()...")
-                val usuarioPadrao = Usuario.criarPadrao(
-                    uid = uid,
-                    email = auth.currentUser?.email ?: "",
-                    nome = auth.currentUser?.displayName
-                )
-                docRef.set(usuarioPadrao.toMap(), SetOptions.merge())
-                    .addOnSuccessListener {
-                        Log.d(TAG, "observarPerfil: Documento padrão criado com sucesso para UID: $uid")
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e(TAG, "observarPerfil: Falha ao criar documento padrão para UID $uid: ${e.message}", e)
-                    }
-                trySend(usuarioPadrao)
+                Log.d(TAG, "observarPerfil: Documento ainda não existe para UID: $uid.")
+                trySend(null)
             }
         }
 
@@ -241,7 +217,14 @@ class AuthRepositoryImpl(
         }
     }
 
-    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String?): Result<Usuario> {
+    override suspend fun cadastrar(
+        nome: String,
+        telefone: String,
+        email: String,
+        senha: String,
+        codigoPaciente: String?,
+        perfil: String
+    ): Result<Usuario> {
         var usuarioAutenticado = auth.currentUser
         return try {
             if (usuarioAutenticado != null && !usuarioAutenticado.email.equals(email.trim(), ignoreCase = true)) {
@@ -268,7 +251,43 @@ class AuthRepositoryImpl(
                     .onFailure { Log.w(TAG, "cadastrar: Nao foi possivel atualizar o nome de exibicao.", it) }
             }
 
-            val pessoaDeConfianca = !codigoPaciente.isNullOrBlank()
+            val perfilCadastro = perfil.trim().uppercase()
+            if (perfilCadastro !in setOf(
+                    Usuario.PERFIL_PACIENTE,
+                    Usuario.PERFIL_PESSOA_DE_CONFIANCA,
+                    Usuario.PERFIL_CUIDADOR
+                )
+            ) {
+                throw IllegalArgumentException("Perfil de cadastro inválido.")
+            }
+            if (perfilCadastro == Usuario.PERFIL_PESSOA_DE_CONFIANCA && codigoPaciente.isNullOrBlank()) {
+                throw IllegalArgumentException("Informe o código do paciente.")
+            }
+
+            if (perfilCadastro == Usuario.PERFIL_CUIDADOR) {
+                val usuario = Usuario(
+                    id = firebaseUser.uid,
+                    nome = nome.trim(),
+                    telefone = telefone.trim(),
+                    email = firebaseUser.email ?: email.trim(),
+                    perfil = Usuario.PERFIL_CUIDADOR,
+                    ativo = true,
+                    criadoEm = Timestamp.now()
+                )
+                firestore.collection(COLECAO_USUARIOS)
+                    .document(firebaseUser.uid)
+                    .set(
+                        usuario.toMap() + mapOf(
+                            "codigoPaciente" to null,
+                            "codigoVinculo" to null
+                        ),
+                        SetOptions.merge()
+                    )
+                    .await()
+                return Result.success(usuario)
+            }
+
+            val pessoaDeConfianca = perfilCadastro == Usuario.PERFIL_PESSOA_DE_CONFIANCA
             val resultadoFuncao = functions
                 .getHttpsCallable(if (pessoaDeConfianca) "criarPerfilPessoaDeConfianca" else "criarPerfilPaciente")
                 .call(buildMap {
@@ -285,7 +304,7 @@ class AuthRepositoryImpl(
             val nomeSalvo = dadosPerfil["nome"] as? String
             val telefoneSalvo = dadosPerfil["telefone"] as? String
             val emailSalvo = dadosPerfil["email"] as? String
-            val perfilEsperado = if (pessoaDeConfianca) Usuario.PERFIL_PESSOA_DE_CONFIANCA else Usuario.PERFIL_PACIENTE
+            val perfilEsperado = perfilCadastro
             if (nomeSalvo == null || telefoneSalvo == null || emailSalvo == null || dadosPerfil["perfil"] != perfilEsperado ||
                 (pessoaDeConfianca && (pacienteUid.isNullOrBlank() || codigoPacienteDigitadoSalvo.isNullOrBlank() || codigoVinculo != null)) ||
                 (!pessoaDeConfianca && codigoVinculo.isNullOrBlank())) {
@@ -310,6 +329,7 @@ class AuthRepositoryImpl(
             )
         } catch (e: Exception) {
             Log.e(TAG, "cadastrar: Falha no fluxo de cadastro: ${e.message}", e)
+            Log.e("TomaAi_AuthViewModel", "Erro detalhado ao gravar no Firestore: ${e.message}", e)
             val codigoFunction = (e as? com.google.firebase.functions.FirebaseFunctionsException)?.code
             val mensagemDefinitiva = when (codigoFunction) {
                 com.google.firebase.functions.FirebaseFunctionsException.Code.NOT_FOUND -> "Código do paciente inválido. Confira o código e tente novamente."
@@ -328,7 +348,7 @@ class AuthRepositoryImpl(
                 } else {
                     mapearMensagemErro(e)
                 }
-            Result.failure(AuthRepositoryException(mensagem, cadastroPendente = pendente))
+            Result.failure(AuthRepositoryException(mensagem, cadastroPendente = pendente, causa = e))
         }
     }
 
@@ -336,6 +356,17 @@ class AuthRepositoryImpl(
         return try {
             if (uid.isBlank() || auth.currentUser?.uid != uid) {
                 throw AuthRepositoryException("Faça login novamente para atualizar o código do paciente.")
+            }
+            val usuarioSnapshot = firestore.collection(COLECAO_USUARIOS).document(uid).get().await()
+            val perfil = usuarioSnapshot.getString("perfil")
+            if (!usuarioSnapshot.exists() || perfil != Usuario.PERFIL_PACIENTE) {
+                throw AuthRepositoryException("Somente pacientes podem gerar um código de vínculo.")
+            }
+            val codigoAtual = usuarioSnapshot.getString("codigoPaciente")
+                ?.takeIf { it.isNotBlank() }
+                ?: usuarioSnapshot.getString("codigoVinculo")?.takeIf { it.isNotBlank() }
+            if (codigoAtual != null) {
+                return Result.success(codigoAtual)
             }
             val resultado = try {
                 functions.getHttpsCallable("garantirCodigoPaciente")
@@ -345,8 +376,8 @@ class AuthRepositoryImpl(
                 if (erroFunctions.code == com.google.firebase.functions.FirebaseFunctionsException.Code.NOT_FOUND) {
                     val codigo = repararCodigoPacienteSeNecessario(
                         uid = uid,
-                        perfil = Usuario.PERFIL_PACIENTE,
-                        codigoAtual = null
+                        perfil = perfil.orEmpty(),
+                        codigoAtual = codigoAtual
                     ) ?: throw IllegalStateException("Não foi possível reparar o código do paciente.")
                     return Result.success(codigo)
                 }
@@ -428,15 +459,8 @@ class AuthRepositoryImpl(
                 val usuario = mapearDocumentoParaUsuario(snapshot, uid, auth.currentUser?.email, auth.currentUser?.displayName)
                 Result.success(usuario)
             } else {
-                Log.d(TAG, "buscarPerfil: Documento inexistente para UID: $uid. Criando documento padrão...")
-                val usuarioPadrao = Usuario.criarPadrao(
-                    uid = uid,
-                    email = auth.currentUser?.email ?: "",
-                    nome = auth.currentUser?.displayName
-                )
-                docRef.set(usuarioPadrao.toMap(), SetOptions.merge()).await()
-                Log.d(TAG, "buscarPerfil: Documento padrão criado com sucesso para UID: $uid")
-                Result.success(usuarioPadrao)
+                Log.d(TAG, "buscarPerfil: Documento inexistente para UID: $uid.")
+                Result.success(null)
             }
         } catch (e: Exception) {
             Log.e(TAG, "buscarPerfil: Erro ao buscar perfil para UID $uid: ${e.message}", e)

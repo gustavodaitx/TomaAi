@@ -190,11 +190,22 @@ class AuthViewModel(
         confirmacaoSenha: String,
         codigoPaciente: String? = null,
         cadastroPessoaDeConfianca: Boolean = false,
+        perfilCadastro: String? = null,
         onSucesso: () -> Unit = {}
     ) {
         if (_uiState.value.isLoading) return
 
-        val erroValidacao = validarCamposCadastro(nome, telefone, email, senha, confirmacaoSenha, codigoPaciente, cadastroPessoaDeConfianca)
+        val perfilSolicitado = perfilCadastro?.trim()?.uppercase()
+            ?: if (cadastroPessoaDeConfianca) Usuario.PERFIL_PESSOA_DE_CONFIANCA else Usuario.PERFIL_PACIENTE
+        val erroValidacao = validarCamposCadastro(
+            nome,
+            telefone,
+            email,
+            senha,
+            confirmacaoSenha,
+            codigoPaciente,
+            perfilSolicitado == Usuario.PERFIL_PESSOA_DE_CONFIANCA
+        )
         if (erroValidacao != null) {
             _uiState.update { it.copy(erro = erroValidacao) }
             return
@@ -204,7 +215,14 @@ class AuthViewModel(
 
         viewModelScope.launch {
             Log.d(TAG, "cadastrar: Disparando cadastro para $email")
-            val resultado = authRepository.cadastrar(nome = nome.trim(), telefone = telefone.trim(), email = email.trim(), senha = senha, codigoPaciente = codigoPaciente?.trim()?.takeIf { it.isNotBlank() })
+            val resultado = authRepository.cadastrar(
+                nome = nome.trim(),
+                telefone = telefone.trim(),
+                email = email.trim(),
+                senha = senha,
+                codigoPaciente = codigoPaciente?.trim()?.takeIf { it.isNotBlank() },
+                perfil = perfilSolicitado
+            )
             resultado.fold(
                 onSuccess = { usuario ->
                     Log.d(TAG, "cadastrar: Sucesso para UID: ${usuario.id}")
@@ -223,7 +241,7 @@ class AuthViewModel(
                     onSucesso()
                 },
                 onFailure = { falha ->
-                    Log.e(TAG, "cadastrar: Falha no fluxo de cadastro.")
+                    Log.e(TAG, "cadastrar: Falha no fluxo de cadastro: ${falha.message}", falha)
                     _uiState.update {
                         it.copy(
                             isLoading = false,

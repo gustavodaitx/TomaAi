@@ -166,6 +166,44 @@ class AuthViewModelTest {
         assertEquals("carlos@tomai.com", state.usuario?.email)
         assertEquals("Conta criada com sucesso!", state.sucessoMensagem)
         assertTrue(callbackSucessoChamado)
+        assertEquals(Usuario.PERFIL_PACIENTE, fakeRepository.perfilCadastro)
+    }
+
+    @Test
+    fun cadastrar_comPessoaDeConfianca_deveRepassarPerfilCorreto() = runTest {
+        viewModel.cadastrar(
+            nome = "Ana Silva",
+            telefone = "11999999999",
+            email = "ana@tomai.com",
+            senha = "senhaSegura123",
+            confirmacaoSenha = "senhaSegura123",
+            codigoPaciente = "TMA-ABC123",
+            cadastroPessoaDeConfianca = true
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(Usuario.PERFIL_PESSOA_DE_CONFIANCA, fakeRepository.perfilCadastro)
+        assertEquals(Usuario.PERFIL_PESSOA_DE_CONFIANCA, viewModel.uiState.value.usuario?.perfil)
+    }
+
+    @Test
+    fun cadastrar_comCuidador_deveRepassarPerfilSemCodigoPaciente() = runTest {
+        viewModel.cadastrar(
+            nome = "Carlos Silva",
+            telefone = "11999999999",
+            email = "carlos@tomai.com",
+            senha = "senhaSegura123",
+            confirmacaoSenha = "senhaSegura123",
+            perfilCadastro = Usuario.PERFIL_CUIDADOR
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(Usuario.PERFIL_CUIDADOR, fakeRepository.perfilCadastro)
+        assertEquals(Usuario.PERFIL_CUIDADOR, viewModel.uiState.value.usuario?.perfil)
+        assertNull(viewModel.uiState.value.usuario?.codigoPaciente)
+        assertNull(viewModel.uiState.value.usuario?.codigoVinculo)
     }
 
     @Test
@@ -279,6 +317,7 @@ class FakeAuthRepository : AuthRepository {
     var falhaCadastro: Throwable? = null
     var bloqueioCadastro: CompletableDeferred<Unit>? = null
     var quantidadeChamadasCadastro: Int = 0
+    var perfilCadastro: String? = null
 
     override fun obterUsuarioAtualId(): String? = _usuarioAtualFlow.value?.id
 
@@ -298,8 +337,9 @@ class FakeAuthRepository : AuthRepository {
         return Result.success(user)
     }
 
-    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String?): Result<Usuario> {
+    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String?, perfil: String): Result<Usuario> {
         quantidadeChamadasCadastro += 1
+        perfilCadastro = perfil
         bloqueioCadastro?.await()
         falhaCadastro?.let { return Result.failure(it) }
         if (deveFalhar) return Result.failure(Exception(mensagemFalha))
@@ -308,7 +348,7 @@ class FakeAuthRepository : AuthRepository {
             nome = nome,
             telefone = telefone,
             email = email,
-            perfil = Usuario.PERFIL_PACIENTE,
+            perfil = perfil,
             ativo = true
         )
         _usuarioAtualFlow.value = user
@@ -346,4 +386,3 @@ class FakeAuthRepository : AuthRepository {
         _perfilFlow.value = usuario
     }
 }
-

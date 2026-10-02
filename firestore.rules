@@ -5,7 +5,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============================================================
-    // FUNÇÕES GERAIS
+    // FUNÇÕES GERAIS E AUXILIARES
     // ============================================================
 
     function signedIn() {
@@ -20,30 +20,25 @@ service cloud.firestore {
       return signedIn() && resource.data.usuarioId == request.auth.uid;
     }
 
-    // ============================================================
-    // PERFIL DO USUÁRIO
-    // ============================================================
-
     function perfilAtual() {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil;
     }
 
-    function ehPaciente() {
-      return signedIn() && perfilAtual() == 'PACIENTE';
-    }
-
     function ehCuidador() {
-      return signedIn() && (perfilAtual() == 'CUIDADOR' || perfilAtual() == 'PESSOA_DE_CONFIANCA');
+      return signedIn() && (
+        perfilAtual() == 'CUIDADOR' || 
+        perfilAtual() == 'PESSOA_DE_CONFIANCA'
+      );
     }
 
-    // ============================================================
-    // VÍNCULO PACIENTE / PESSOA DE CONFIANÇA
-    // ============================================================
-
+    // Verifica se a Pessoa de Confiança / Cuidador possui vínculo ativo com o paciente
     function cuidadorVinculado(pacienteUid) {
       let vinculoPath = /databases/$(database)/documents/vinculos/$(pacienteUid + '_' + request.auth.uid);
-      return ehCuidador() && exists(vinculoPath) && get(vinculoPath).data.ativo == true;
+      return ehCuidador() 
+        && exists(vinculoPath) 
+        && get(vinculoPath).data.ativo == true;
     }
+
 
     // ============================================================
     // USUÁRIOS
@@ -58,7 +53,7 @@ service cloud.firestore {
         && request.resource.data.id == userId
         && request.resource.data.perfil in ['PACIENTE', 'PESSOA_DE_CONFIANCA', 'CUIDADOR'];
 
-      // Permite atualização pelo próprio dono do perfil
+      // Permite atualização de campos (ex: codigoPaciente, telefone, responsavelPadraoId) pelo próprio dono
       allow update: if owns(userId);
 
       allow delete: if false;
@@ -70,10 +65,18 @@ service cloud.firestore {
     // ============================================================
 
     match /medicamentos/{medicamentoId} {
-      allow read: if ownsExisting();
-      allow create: if signedIn() && request.resource.data.usuarioId == request.auth.uid;
-      allow update: if ownsExisting() && request.resource.data.usuarioId == resource.data.usuarioId;
-      allow delete: if ownsExisting();
+
+      // Leitura: O próprio Paciente OU a Pessoa de Confiança vinculada
+      allow read: if signedIn() && (
+        resource.data.usuarioId == request.auth.uid ||
+        cuidadorVinculado(resource.data.usuarioId)
+      );
+
+      // Escrita (Criar/Editar/Excluir): Apenas o Paciente dono do registro
+      allow create: if signedIn() 
+        && request.resource.data.usuarioId == request.auth.uid;
+
+      allow update, delete: if ownsExisting();
     }
 
 
@@ -82,28 +85,49 @@ service cloud.firestore {
     // ============================================================
 
     match /horarios_medicamentos/{horarioId} {
-      allow read: if ownsExisting();
 
+      // Leitura: O próprio Paciente OU a Pessoa de Confiança vinculada
+      allow read: if signedIn() && (
+        resource.data.usuarioId == request.auth.uid ||
+        cuidadorVinculado(resource.data.usuarioId)
+      );
+
+      // Criar: Apenas o Paciente dono do medicamento
       allow create: if signedIn()
         && request.resource.data.usuarioId == request.auth.uid
         && request.resource.data.medicamentoId is string
         && exists(/databases/$(database)/documents/medicamentos/$(request.resource.data.medicamentoId))
         && get(/databases/$(database)/documents/medicamentos/$(request.resource.data.medicamentoId)).data.usuarioId == request.auth.uid;
 
-      allow update: if ownsExisting()
-        && request.resource.data.usuarioId == resource.data.usuarioId
-        && request.resource.data.medicamentoId == resource.data.medicamentoId;
-
-      allow delete: if ownsExisting();
+      // Editar/Excluir: Apenas o Paciente dono
+      allow update, delete: if ownsExisting();
     }
 
 
     // ============================================================
-    // DOSES
+    // DOSES DA AGENDA
     // ============================================================
 
     match /doses/{doseId} {
-      allow read, create, update, delete: if signedIn();
+
+      // Leitura: O próprio Paciente OU a Pessoa de Confiança vinculada
+      allow read: if signedIn() && (
+        resource.data.usuarioId == request.auth.uid ||
+        cuidadorVinculado(resource.data.usuarioId)
+      );
+
+      // Criar Doses (Geração diária/automática): Paciente logado
+      allow create: if signedIn() 
+        && request.resource.data.usuarioId == request.auth.uid;
+
+      // Atualizar status da dose (ex: marcar como tomada): Paciente ou Pessoa de Confiança vinculada
+      allow update: if signedIn() && (
+        resource.data.usuarioId == request.auth.uid ||
+        cuidadorVinculado(resource.data.usuarioId)
+      );
+
+      // Excluir Doses: Apenas o Paciente
+      allow delete: if ownsExisting();
     }
 
 
