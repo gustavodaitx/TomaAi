@@ -3,6 +3,7 @@ package br.com.tomai.data.repository
 import android.util.Log
 import br.com.tomai.model.Medicamento
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
@@ -12,13 +13,16 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class MedicamentoRepositoryImpl(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) : MedicamentoRepository {
 
     companion object {
         const val COLECAO_MEDICAMENTOS = "medicamentos"
         private const val TAG = "TomaAi_MedicamentoRepo"
     }
+
+    private val pacienteVinculadoResolver = PacienteVinculadoResolver(firestore, auth)
 
     override fun observarMedicamentos(usuarioId: String): Flow<List<Medicamento>> = callbackFlow {
         if (usuarioId.isBlank()) {
@@ -27,9 +31,21 @@ class MedicamentoRepositoryImpl(
             return@callbackFlow
         }
 
-        var registration: ListenerRegistration? = null
-        registration = firestore.collection(COLECAO_MEDICAMENTOS)
-            .whereEqualTo("usuarioId", usuarioId)
+        val pacienteUid = try {
+            pacienteVinculadoResolver.resolverUidPaciente(usuarioId)
+        } catch (e: Exception) {
+            Log.e(TAG, "observarMedicamentos: não foi possível resolver o paciente", e)
+            close(e)
+            return@callbackFlow
+        }
+        if (pacienteUid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val registration = firestore.collection(COLECAO_MEDICAMENTOS)
+            .whereEqualTo("usuarioId", pacienteUid)
             .whereEqualTo("ativo", true)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -49,9 +65,7 @@ class MedicamentoRepositoryImpl(
                 trySend(lista)
             }
 
-        awaitClose {
-            registration?.remove()
-        }
+        awaitClose { registration.remove() }
     }
 
     override suspend fun buscarPorId(medicamentoId: String): Result<Medicamento?> {

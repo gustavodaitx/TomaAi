@@ -74,6 +74,7 @@ class AuthViewModel(
                             nome = recebido.nome.ifBlank { anterior.nome },
                             telefone = recebido.telefone.ifBlank { anterior.telefone },
                             email = recebido.email.ifBlank { anterior.email },
+                            pacienteUid = recebido.pacienteUid ?: anterior.pacienteUid,
                             codigoPaciente = recebido.codigoPaciente?.takeIf { it.isNotBlank() }
                                 ?: recebido.codigoVinculo?.takeIf { it.isNotBlank() }
                                 ?: anterior.codigoPaciente

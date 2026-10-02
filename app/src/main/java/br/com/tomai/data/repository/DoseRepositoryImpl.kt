@@ -24,6 +24,8 @@ class DoseRepositoryImpl(
         private const val TAG = "TomaAi_DoseRepo"
     }
 
+    private val pacienteVinculadoResolver = PacienteVinculadoResolver(firestore, auth)
+
     override fun observarDosesDoDia(usuarioId: String, dataAgenda: String): Flow<List<Dose>> =
         callbackFlow {
             if (usuarioId.isBlank() || dataAgenda.isBlank()) {
@@ -32,8 +34,21 @@ class DoseRepositoryImpl(
                 return@callbackFlow
             }
 
+            val pacienteUid = try {
+                pacienteVinculadoResolver.resolverUidPaciente(usuarioId)
+            } catch (e: Exception) {
+                Log.e(TAG, "observarDosesDoDia: não foi possível resolver o paciente", e)
+                close(e)
+                return@callbackFlow
+            }
+            if (pacienteUid == null) {
+                trySend(emptyList())
+                close()
+                return@callbackFlow
+            }
+
             val registration = firestore.collection(COLECAO_DOSES)
-                .whereEqualTo("usuarioId", usuarioId)
+                .whereEqualTo("usuarioId", pacienteUid)
                 .whereEqualTo("dataAgenda", dataAgenda)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
@@ -60,8 +75,9 @@ class DoseRepositoryImpl(
 
     override suspend fun buscarHistorico(usuarioId: String, dataInicio: String, dataFim: String): List<Dose> {
         require(usuarioId.isNotBlank()) { "Usuário não identificado." }
+        val pacienteUid = pacienteVinculadoResolver.resolverUidPaciente(usuarioId) ?: return emptyList()
         val snapshot = firestore.collection(COLECAO_DOSES)
-            .whereEqualTo("usuarioId", usuarioId)
+            .whereEqualTo("usuarioId", pacienteUid)
             .whereGreaterThanOrEqualTo("dataAgenda", dataInicio)
             .whereLessThanOrEqualTo("dataAgenda", dataFim)
             .get()
@@ -81,8 +97,9 @@ class DoseRepositoryImpl(
         return try {
             val authenticatedUid = auth.currentUser?.uid
                 ?: return Result.failure(IllegalStateException("Sessão expirada. Faça login novamente."))
-            if (usuarioId.isNotBlank() && usuarioId != authenticatedUid) {
-                return Result.failure(IllegalStateException("O usuário da sessão não corresponde ao usuário da agenda."))
+            val pacienteUid = pacienteVinculadoResolver.resolverUidPaciente(usuarioId)
+            if (pacienteUid == null || pacienteUid != authenticatedUid) {
+                return Result.success(Unit)
             }
             if (medicamentos.any { it.ativo && it.usuarioId != authenticatedUid }) {
                 return Result.failure(IllegalStateException("A agenda contém medicamentos de outro usuário."))

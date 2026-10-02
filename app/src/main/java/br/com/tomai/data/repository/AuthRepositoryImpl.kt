@@ -307,7 +307,10 @@ class AuthRepositoryImpl(
                                 "criadoEm" to FieldValue.serverTimestamp()
                             )
                         ).await()
-                        usuarioRef.update("pacienteUid", pacienteUid).await()
+                        runCatching { usuarioRef.update("pacienteUid", pacienteUid).await() }
+                            .onFailure {
+                                Log.e(TAG, "Vínculo criado, mas não foi possível atualizar pacienteUid no perfil.", it)
+                            }
                         Log.d(TAG, "Cadastro vinculado ao paciente $pacienteUid.")
                         return Result.success(usuario.copy(pacienteUid = pacienteUid))
                     }
