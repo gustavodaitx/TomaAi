@@ -11,8 +11,6 @@ import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
@@ -345,7 +343,12 @@ class AuthRepositoryImpl(
                     .await()
             } catch (erroFunctions: com.google.firebase.functions.FirebaseFunctionsException) {
                 if (erroFunctions.code == com.google.firebase.functions.FirebaseFunctionsException.Code.NOT_FOUND) {
-                    return Result.success(gerarCodigoPacienteLocalmente(uid))
+                    val codigo = repararCodigoPacienteSeNecessario(
+                        uid = uid,
+                        perfil = Usuario.PERFIL_PACIENTE,
+                        codigoAtual = null
+                    ) ?: throw IllegalStateException("Não foi possível reparar o código do paciente.")
+                    return Result.success(codigo)
                 }
                 throw erroFunctions
             }
@@ -369,51 +372,32 @@ class AuthRepositoryImpl(
         return "TMA-$aleatorio"
     }
 
-    private suspend fun gerarCodigoPacienteLocalmente(uid: String): String {
-        if (uid.isBlank() || auth.currentUser?.uid != uid) {
-            throw AuthRepositoryException("Faça login novamente para atualizar o código do paciente.")
+    private suspend fun repararCodigoPacienteSeNecessario(
+        uid: String,
+        perfil: String,
+        codigoAtual: String?
+    ): String? {
+        if (perfil != Usuario.PERFIL_PACIENTE || !codigoAtual.isNullOrBlank()) {
+            return codigoAtual
         }
 
-        val usuarioRef = firestore.collection(COLECAO_USUARIOS).document(uid)
-        repeat(10) {
-            val codigo = gerarCodigoLocalmente()
-            val codigoRef = firestore.collection("codigos_vinculo_pacientes").document(codigo)
+        val novoCodigo = gerarCodigoLocalmente()
 
-            try {
-                return firestore.runTransaction { transaction ->
-                    val usuarioSnapshot = transaction.get(usuarioRef)
-                    if (!usuarioSnapshot.exists() || usuarioSnapshot.getString("perfil") != Usuario.PERFIL_PACIENTE) {
-                        throw IllegalStateException("Perfil de paciente não encontrado para gerar o código.")
-                    }
-
-                    val codigoAtual = usuarioSnapshot.getString("codigoPaciente")
-                        ?.takeIf { it.isNotBlank() }
-                        ?: usuarioSnapshot.getString("codigoVinculo")?.takeIf { it.isNotBlank() }
-                    if (codigoAtual != null) return@runTransaction codigoAtual
-
-                    transaction.set(
-                        codigoRef,
-                        mapOf(
-                            "pacienteUid" to uid,
-                            "criadoEm" to FieldValue.serverTimestamp()
-                        )
+        return try {
+            firestore.collection(COLECAO_USUARIOS).document(uid)
+                .update(
+                    mapOf(
+                        "codigoPaciente" to novoCodigo,
+                        "codigoVinculo" to novoCodigo
                     )
-                    transaction.update(
-                        usuarioRef,
-                        mapOf("codigoPaciente" to codigo, "codigoVinculo" to codigo)
-                    )
-                    codigo
-                }.await()
-            } catch (e: FirebaseFirestoreException) {
-                if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                    // Uma reserva já existente de outro paciente causa colisão; tente outro código.
-                    return@repeat
-                }
-                throw e
-            }
+                )
+                .await()
+            Log.d(TAG, "Código do paciente reparado com sucesso: $novoCodigo")
+            novoCodigo
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao gravar código diretamente no Firestore", e)
+            null
         }
-
-        throw IllegalStateException("Não foi possível reservar um código único. Atualize as regras do Firestore e tente novamente.")
     }
 
     override suspend fun recuperarSenha(email: String): Result<Unit> {
