@@ -188,6 +188,24 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun cadastrar_comPessoaDeConfiancaSemCodigo_devePermitirCriacaoSemVinculo() = runTest {
+        viewModel.cadastrar(
+            nome = "Ana Silva",
+            telefone = "11999999999",
+            email = "ana@tomai.com",
+            senha = "senhaSegura123",
+            confirmacaoSenha = "senhaSegura123",
+            cadastroPessoaDeConfianca = true
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(Usuario.PERFIL_PESSOA_DE_CONFIANCA, fakeRepository.perfilCadastro)
+        assertNull(fakeRepository.codigoPacienteCadastro)
+        assertNull(viewModel.uiState.value.erro)
+    }
+
+    @Test
     fun cadastrar_comCuidador_deveRepassarPerfilSemCodigoPaciente() = runTest {
         viewModel.cadastrar(
             nome = "Carlos Silva",
@@ -318,6 +336,7 @@ class FakeAuthRepository : AuthRepository {
     var bloqueioCadastro: CompletableDeferred<Unit>? = null
     var quantidadeChamadasCadastro: Int = 0
     var perfilCadastro: String? = null
+    var codigoPacienteCadastro: String? = null
 
     override fun obterUsuarioAtualId(): String? = _usuarioAtualFlow.value?.id
 
@@ -340,6 +359,7 @@ class FakeAuthRepository : AuthRepository {
     override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String?, perfil: String): Result<Usuario> {
         quantidadeChamadasCadastro += 1
         perfilCadastro = perfil
+        codigoPacienteCadastro = codigoPaciente
         bloqueioCadastro?.await()
         falhaCadastro?.let { return Result.failure(it) }
         if (deveFalhar) return Result.failure(Exception(mensagemFalha))

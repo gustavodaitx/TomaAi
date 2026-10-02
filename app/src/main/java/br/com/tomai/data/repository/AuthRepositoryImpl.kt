@@ -11,6 +11,7 @@ import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
@@ -260,94 +261,69 @@ class AuthRepositoryImpl(
             ) {
                 throw IllegalArgumentException("Perfil de cadastro inválido.")
             }
-            if (perfilCadastro == Usuario.PERFIL_PESSOA_DE_CONFIANCA && codigoPaciente.isNullOrBlank()) {
-                throw IllegalArgumentException("Informe o código do paciente.")
-            }
-
-            if (perfilCadastro == Usuario.PERFIL_CUIDADOR) {
-                val usuario = Usuario(
-                    id = firebaseUser.uid,
-                    nome = nome.trim(),
-                    telefone = telefone.trim(),
-                    email = firebaseUser.email ?: email.trim(),
-                    perfil = Usuario.PERFIL_CUIDADOR,
-                    ativo = true,
-                    criadoEm = Timestamp.now()
-                )
-                firestore.collection(COLECAO_USUARIOS)
-                    .document(firebaseUser.uid)
-                    .set(
-                        usuario.toMap() + mapOf(
-                            "codigoPaciente" to null,
-                            "codigoVinculo" to null
-                        ),
-                        SetOptions.merge()
-                    )
-                    .await()
-                return Result.success(usuario)
-            }
-
-            val pessoaDeConfianca = perfilCadastro == Usuario.PERFIL_PESSOA_DE_CONFIANCA
-            val resultadoFuncao = functions
-                .getHttpsCallable(if (pessoaDeConfianca) "criarPerfilPessoaDeConfianca" else "criarPerfilPaciente")
-                .call(buildMap {
-                    put("nome", nome.trim())
-                    put("telefone", telefone.trim())
-                    if (pessoaDeConfianca) put("codigoPaciente", codigoPaciente!!.trim().uppercase())
-                })
-                .await()
-            val dadosPerfil = resultadoFuncao.data as? Map<*, *>
-                ?: throw IllegalStateException("Resposta invalida ao concluir cadastro.")
-            val codigoVinculo = (dadosPerfil["codigoPaciente"] as? String) ?: (dadosPerfil["codigoVinculo"] as? String)
-            val pacienteUid = dadosPerfil["pacienteUid"] as? String
-            val codigoPacienteDigitadoSalvo = dadosPerfil["codigoPacienteDigitado"] as? String
-            val nomeSalvo = dadosPerfil["nome"] as? String
-            val telefoneSalvo = dadosPerfil["telefone"] as? String
-            val emailSalvo = dadosPerfil["email"] as? String
-            val perfilEsperado = perfilCadastro
-            if (nomeSalvo == null || telefoneSalvo == null || emailSalvo == null || dadosPerfil["perfil"] != perfilEsperado ||
-                (pessoaDeConfianca && (pacienteUid.isNullOrBlank() || codigoPacienteDigitadoSalvo.isNullOrBlank() || codigoVinculo != null)) ||
-                (!pessoaDeConfianca && codigoVinculo.isNullOrBlank())) {
-                throw IllegalStateException("Resposta invalida ao concluir cadastro.")
-            }
-
-            Result.success(
-                Usuario(
-                    id = firebaseUser.uid,
-                    nome = nomeSalvo,
-                    telefone = telefoneSalvo,
-                    email = emailSalvo,
-                    perfil = perfilEsperado,
-                    ativo = true,
-                    criadoEm = Timestamp.now(),
-                    codigoVinculo = codigoVinculo,
-                    pacienteUid = pacienteUid,
-                    codigoPaciente = codigoVinculo,
-                    codigoPacienteDigitado = codigoPacienteDigitadoSalvo,
-                    aceitouReceberAvisos = dadosPerfil["aceitouReceberAvisos"] as? Boolean ?: true
-                )
+            val uid = firebaseUser.uid
+            val emailSalvo = firebaseUser.email ?: email.trim()
+            val codigoDigitado = codigoPaciente?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+            val codigoGerado = if (perfilCadastro == Usuario.PERFIL_PACIENTE) {
+                gerarCodigoLocalmente()
+            } else null
+            val usuario = Usuario(
+                id = uid,
+                nome = nome.trim(),
+                telefone = telefone.trim(),
+                email = emailSalvo,
+                perfil = perfilCadastro,
+                ativo = true,
+                criadoEm = Timestamp.now(),
+                codigoVinculo = codigoGerado,
+                codigoPaciente = codigoGerado,
+                codigoPacienteDigitado = codigoDigitado,
+                aceitouReceberAvisos = true
             )
+            val dadosUsuario = usuario.toMap() + mapOf(
+                "codigoPaciente" to codigoGerado,
+                "codigoVinculo" to codigoGerado,
+                "pacienteUid" to null
+            )
+            val usuarioRef = firestore.collection(COLECAO_USUARIOS).document(uid)
+            usuarioRef.set(dadosUsuario, SetOptions.merge()).await()
+
+            if (perfilCadastro != Usuario.PERFIL_PACIENTE && codigoDigitado != null) {
+                try {
+                    val snapshot = firestore.collection(COLECAO_USUARIOS)
+                        .whereEqualTo("codigoPaciente", codigoDigitado)
+                        .whereEqualTo("perfil", Usuario.PERFIL_PACIENTE)
+                        .get()
+                        .await()
+                    val paciente = snapshot.documents.firstOrNull { it.id != uid }
+                    if (paciente != null) {
+                        val pacienteUid = paciente.id
+                        val vinculoId = "${pacienteUid}_$uid"
+                        firestore.collection("vinculos").document(vinculoId).set(
+                            mapOf(
+                                "pacienteUid" to pacienteUid,
+                                "cuidadorUid" to uid,
+                                "ativo" to true,
+                                "criadoEm" to FieldValue.serverTimestamp()
+                            )
+                        ).await()
+                        usuarioRef.update("pacienteUid", pacienteUid).await()
+                        Log.d(TAG, "Cadastro vinculado ao paciente $pacienteUid.")
+                        return Result.success(usuario.copy(pacienteUid = pacienteUid))
+                    }
+                    Log.w(TAG, "Código de paciente digitado não foi encontrado no Firestore.")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao vincular por código no fallback local", e)
+                }
+            }
+
+            return Result.success(usuario)
         } catch (e: Exception) {
             Log.e(TAG, "cadastrar: Falha no fluxo de cadastro: ${e.message}", e)
-            Log.e("TomaAi_AuthViewModel", "Erro detalhado ao gravar no Firestore: ${e.message}", e)
-            val codigoFunction = (e as? com.google.firebase.functions.FirebaseFunctionsException)?.code
-            val mensagemDefinitiva = when (codigoFunction) {
-                com.google.firebase.functions.FirebaseFunctionsException.Code.NOT_FOUND -> "Código do paciente inválido. Confira o código e tente novamente."
-                com.google.firebase.functions.FirebaseFunctionsException.Code.ALREADY_EXISTS -> "Este cadastro já está vinculado a um paciente."
-                com.google.firebase.functions.FirebaseFunctionsException.Code.FAILED_PRECONDITION -> "Não foi possível vincular a conta com este código."
-                com.google.firebase.functions.FirebaseFunctionsException.Code.INVALID_ARGUMENT ->
-                    "Confira nome e telefone e tente novamente."
-                com.google.firebase.functions.FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED ->
-                    "Nao foi possivel gerar o codigo agora. Tente novamente."
-                else -> null
-            }
             val pendente = usuarioAutenticado != null || auth.currentUser != null
-            val mensagem = mensagemDefinitiva
-                ?: if (pendente) {
-                    "Sua conta foi criada, mas nao foi possivel confirmar o cadastro. Tente novamente."
-                } else {
-                    mapearMensagemErro(e)
-                }
+            val mensagem = if (pendente) {
+                "Sua conta foi criada, mas nao foi possivel confirmar o cadastro. Tente novamente."
+            } else mapearMensagemErro(e)
             Result.failure(AuthRepositoryException(mensagem, cadastroPendente = pendente, causa = e))
         }
     }
