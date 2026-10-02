@@ -330,6 +330,28 @@ class AuthRepositoryImpl(
             Result.failure(AuthRepositoryException(mensagem, cadastroPendente = pendente))
         }
     }
+
+    override suspend fun garantirCodigoPaciente(uid: String): Result<String> {
+        return try {
+            if (uid.isBlank() || auth.currentUser?.uid != uid) {
+                throw AuthRepositoryException("Faça login novamente para atualizar o código do paciente.")
+            }
+            val resultado = functions.getHttpsCallable("garantirCodigoPaciente")
+                .call(emptyMap<String, Any>())
+                .await()
+            val dados = resultado.data as? Map<*, *>
+                ?: throw IllegalStateException("Resposta inválida ao gerar o código do paciente.")
+            val codigo = dados["codigoPaciente"] as? String
+            if (codigo.isNullOrBlank()) {
+                throw IllegalStateException("A função não retornou o código do paciente.")
+            }
+            Result.success(codigo)
+        } catch (e: Exception) {
+            Log.e(TAG, "garantirCodigoPaciente: Falha ao gerar ou recuperar o código para UID $uid.", e)
+            Result.failure(AuthRepositoryException(mapearMensagemErro(e)))
+        }
+    }
+
     override suspend fun recuperarSenha(email: String): Result<Unit> {
         return try {
             Log.d(TAG, "recuperarSenha: Enviando e-mail de recuperação para: ${email.trim()}")

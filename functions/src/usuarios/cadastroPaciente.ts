@@ -5,6 +5,7 @@ export type CodigoErroCadastroPaciente =
   | "unauthenticated"
   | "invalid-argument"
   | "already-exists"
+  | "failed-precondition"
   | "resource-exhausted";
 
 export class ErroCadastroPaciente extends Error {
@@ -46,6 +47,65 @@ export function gerarCodigoVinculo(): string {
     ALFABETO_CODIGO_VINCULO[randomInt(ALFABETO_CODIGO_VINCULO.length)]
   ).join("");
   return `TMA-${sufixo}`;
+}
+
+export async function garantirCodigoPaciente(
+  uid: string,
+  firestore: admin.firestore.Firestore = admin.firestore(),
+  gerarCodigo: () => string = gerarCodigoVinculo
+): Promise<string> {
+  if (!uid.trim()) throw new ErroCadastroPaciente("unauthenticated", "Faça login para continuar.");
+  const usuarioRef = firestore.collection("usuarios").doc(uid);
+
+  for (let tentativa = 0; tentativa < 10; tentativa++) {
+    const codigoCandidato = gerarCodigo();
+    const codigoCandidatoRef = firestore.collection("codigos_vinculo_pacientes").doc(codigoCandidato);
+    const codigoExistenteRef = firestore.collection("codigos_vinculo_pacientes");
+    const resultado = await firestore.runTransaction(async (transaction): Promise<string | null> => {
+      const usuarioSnapshot = await transaction.get(usuarioRef);
+      if (!usuarioSnapshot.exists || usuarioSnapshot.data()?.perfil !== "PACIENTE") {
+        throw new ErroCadastroPaciente("failed-precondition", "Perfil de paciente não encontrado.");
+      }
+
+      const codigoAtual = usuarioSnapshot.data()?.codigoPaciente || usuarioSnapshot.data()?.codigoVinculo;
+      const codigoAtualRef = typeof codigoAtual === "string" && codigoAtual.trim()
+        ? codigoExistenteRef.doc(codigoAtual)
+        : null;
+      const leituras = [transaction.get(codigoCandidatoRef)];
+      if (codigoAtualRef && codigoAtualRef.path !== codigoCandidatoRef.path) leituras.push(transaction.get(codigoAtualRef));
+      const snapshots = await Promise.all(leituras);
+      const candidatoSnapshot = snapshots[0];
+      const codigoAtualSnapshot = codigoAtualRef
+        ? codigoAtualRef.path === codigoCandidatoRef.path ? candidatoSnapshot : snapshots[1]
+        : undefined;
+
+      if (typeof codigoAtual === "string" && codigoAtual.trim() &&
+        (!codigoAtualSnapshot?.exists || codigoAtualSnapshot.data()?.pacienteUid === uid)) {
+        if (!codigoAtualSnapshot?.exists) {
+          transaction.create(codigoAtualRef!, {
+            pacienteUid: uid,
+            criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+        transaction.set(usuarioRef, { codigoPaciente: codigoAtual, codigoVinculo: codigoAtual }, { merge: true });
+        return codigoAtual;
+      }
+
+      if (candidatoSnapshot.exists) return null;
+      transaction.create(codigoCandidatoRef, {
+        pacienteUid: uid,
+        criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.set(usuarioRef, {
+        codigoPaciente: codigoCandidato,
+        codigoVinculo: codigoCandidato,
+      }, { merge: true });
+      return codigoCandidato;
+    });
+    if (resultado) return resultado;
+  }
+
+  throw new ErroCadastroPaciente("resource-exhausted", "Não foi possível gerar o código. Tente novamente.");
 }
 
 export async function criarPerfilPaciente(

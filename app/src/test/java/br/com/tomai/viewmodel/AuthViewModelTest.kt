@@ -316,6 +316,8 @@ class FakeAuthRepository : AuthRepository {
         return Result.success(user)
     }
 
+    override suspend fun garantirCodigoPaciente(uid: String): Result<String> = Result.success("TMA-MOCK22")
+
     override suspend fun recuperarSenha(email: String): Result<Unit> {
         if (deveFalhar) return Result.failure(Exception(mensagemFalha))
         return Result.success(Unit)

@@ -7,18 +7,94 @@ service cloud.firestore {
       return signedIn() && resource.data.usuarioId == request.auth.uid;
     }
 
+    function codigoPacienteRef(codigo) {
+      return /databases/$(database)/documents/codigos_vinculo_pacientes/$(codigo);
+    }
+
+    function pacienteRef(pacienteUid) {
+      return /databases/$(database)/documents/usuarios/$(pacienteUid);
+    }
+
+    function codigoVinculoValido(userId, data) {
+      let codigo = data.get('codigoPaciente', null);
+      return codigo is string
+        && codigo.matches('TMA-[A-HJ-NP-Z2-9]{6}')
+        && data.get('codigoVinculo', null) == codigo
+        && exists(codigoPacienteRef(codigo))
+        && get(codigoPacienteRef(codigo)).data.get('pacienteUid', null) == userId;
+    }
+
+    function codigoVinculoOpcionalValido(userId, data) {
+      let codigo = data.get('codigoPaciente', null);
+      let codigoLegado = data.get('codigoVinculo', null);
+      return (codigo == null && codigoLegado == null)
+        || codigoVinculoValido(userId, data);
+    }
+
+    function vinculoPessoaDeConfiancaValido(data) {
+      let codigo = data.get('codigoPacienteDigitado', null);
+      let pacienteUid = data.get('pacienteUid', null);
+      return codigo is string
+        && codigo.matches('TMA-[A-HJ-NP-Z2-9]{6}')
+        && pacienteUid is string
+        && exists(codigoPacienteRef(codigo))
+        && get(codigoPacienteRef(codigo)).data.get('pacienteUid', null) == pacienteUid
+        && exists(pacienteRef(pacienteUid))
+        && get(pacienteRef(pacienteUid)).data.get('perfil', null) == 'PACIENTE';
+    }
+
+    function camposUsuarioValidos(userId, data) {
+      return data.keys().hasOnly([
+          'id', 'nome', 'telefone', 'email', 'perfil', 'ativo', 'criadoEm',
+          'asaasCustomerId', 'responsavelPadraoId', 'codigoVinculo', 'pacienteUid',
+          'codigoPaciente', 'codigoPacienteDigitado', 'aceitouReceberAvisos'
+        ])
+        && data.get('id', null) == userId
+        && data.get('nome', null) is string
+        && data.get('telefone', '') is string
+        && data.get('email', null) is string
+        && data.get('perfil', null) in ['PACIENTE', 'PESSOA_DE_CONFIANCA']
+        && data.get('ativo', null) is bool
+        && data.get('criadoEm', null) is timestamp
+        && (data.get('asaasCustomerId', null) == null || data.get('asaasCustomerId', null) is string)
+        && (data.get('responsavelPadraoId', null) == null || data.get('responsavelPadraoId', null) is string)
+        && (data.get('aceitouReceberAvisos', null) == null || data.get('aceitouReceberAvisos', null) is bool);
+    }
+
+    function camposPerfilValidos(userId, data) {
+      return data.perfil == 'PACIENTE'
+        ? codigoVinculoOpcionalValido(userId, data)
+          && data.get('pacienteUid', null) == null
+          && data.get('codigoPacienteDigitado', null) == null
+          && data.get('aceitouReceberAvisos', null) == null
+        : vinculoPessoaDeConfiancaValido(data)
+          && data.get('codigoPaciente', null) == null
+          && data.get('codigoVinculo', null) == null
+          && data.get('aceitouReceberAvisos', null) is bool;
+    }
+
+    function camposImutaveisUsuarioIguais() {
+      return request.resource.data.get('id', null) == resource.data.get('id', null)
+        && request.resource.data.perfil == resource.data.perfil
+        && request.resource.data.ativo == resource.data.ativo
+        && request.resource.data.criadoEm == resource.data.criadoEm
+        && request.resource.data.get('asaasCustomerId', null) == resource.data.get('asaasCustomerId', null);
+    }
+
     match /usuarios/{userId} {
       allow read: if owns(userId);
       allow create: if owns(userId)
-        && request.resource.data.keys().hasOnly([
-          'id', 'nome', 'email', 'perfil', 'ativo', 'criadoEm'
-        ])
-        && request.resource.data.id == userId
-        && request.resource.data.perfil == 'PACIENTE';
+        && camposUsuarioValidos(userId, request.resource.data)
+        && request.resource.data.keys().hasAll(['id', 'nome', 'email', 'perfil', 'ativo', 'criadoEm'])
+        && camposPerfilValidos(userId, request.resource.data);
       allow update: if owns(userId)
+        && camposUsuarioValidos(userId, request.resource.data)
+        && camposImutaveisUsuarioIguais()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'nome', 'email', 'responsavelPadraoId'
+          'nome', 'telefone', 'email', 'responsavelPadraoId', 'codigoVinculo',
+          'codigoPaciente', 'pacienteUid', 'codigoPacienteDigitado', 'aceitouReceberAvisos'
         ])
+        && camposPerfilValidos(userId, request.resource.data)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['responsavelPadraoId'])
           || request.resource.data.responsavelPadraoId == null
           || get(/databases/$(database)/documents/pessoas_confianca/$(request.resource.data.responsavelPadraoId)).data.usuarioId == userId);

@@ -22,6 +22,8 @@ interface AuthRepository {
 
     suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String? = null): Result<Usuario>
 
+    suspend fun garantirCodigoPaciente(uid: String): Result<String>
+
     suspend fun recuperarSenha(email: String): Result<Unit>
 
     suspend fun logout()

@@ -27,6 +27,7 @@ class AuthViewModel(
     }
 
     private var perfilObservationJob: Job? = null
+    private val codigosPacienteVerificados = mutableSetOf<String>()
 
     private val _uiState = MutableStateFlow(
         AuthUiState(
@@ -64,14 +65,55 @@ class AuthViewModel(
         perfilObservationJob?.cancel()
         perfilObservationJob = viewModelScope.launch {
             authRepository.observarPerfil(uid).collect { usuarioAtualizado ->
-                Log.d(TAG, "observarUsuarioFirestore: Dados recebidos do Firestore para UID: $uid: $usuarioAtualizado")
                 val uidFinal = usuarioAtualizado?.id?.takeIf { it.isNotBlank() } ?: uid
+                val usuarioAnterior = _uiState.value.usuario
+                val usuarioVisivel = usuarioAtualizado?.let { recebido ->
+                    val anterior = usuarioAnterior?.takeIf { it.id == recebido.id }
+                    if (anterior != null) {
+                        recebido.copy(
+                            nome = recebido.nome.ifBlank { anterior.nome },
+                            telefone = recebido.telefone.ifBlank { anterior.telefone },
+                            email = recebido.email.ifBlank { anterior.email },
+                            codigoPaciente = recebido.codigoPaciente?.takeIf { it.isNotBlank() }
+                                ?: recebido.codigoVinculo?.takeIf { it.isNotBlank() }
+                                ?: anterior.codigoPaciente
+                                ?: anterior.codigoVinculo,
+                            codigoVinculo = recebido.codigoVinculo?.takeIf { it.isNotBlank() }
+                                ?: recebido.codigoPaciente?.takeIf { it.isNotBlank() }
+                                ?: anterior.codigoVinculo
+                                ?: anterior.codigoPaciente
+                        )
+                    } else recebido
+                }
+                Log.d(TAG, "observarUsuarioFirestore: Dados recebidos do Firestore para UID: $uid: $usuarioVisivel")
                 _uiState.update { estado ->
                     estado.copy(
-                        usuario = usuarioAtualizado ?: estado.usuario,
+                        usuario = usuarioVisivel ?: estado.usuario,
                         firestoreUid = uidFinal,
                         estaAutenticado = true
                     )
+                }
+                if (usuarioVisivel?.perfil == Usuario.PERFIL_PACIENTE &&
+                    usuarioVisivel.codigoPaciente.isNullOrBlank() &&
+                    usuarioVisivel.codigoVinculo.isNullOrBlank() &&
+                    !_uiState.value.isLoading &&
+                    codigosPacienteVerificados.add(uidFinal)) {
+                    viewModelScope.launch {
+                        authRepository.garantirCodigoPaciente(uidFinal).fold(
+                            onSuccess = { codigo ->
+                                _uiState.update { estado ->
+                                    val usuarioAtual = estado.usuario
+                                    if (usuarioAtual?.id == uidFinal && usuarioAtual.perfil == Usuario.PERFIL_PACIENTE) {
+                                        estado.copy(usuario = usuarioAtual.copy(codigoPaciente = codigo, codigoVinculo = codigo))
+                                    } else estado
+                                }
+                                Log.d(TAG, "observarUsuarioFirestore: Código de vínculo reparado para UID $uidFinal: $codigo")
+                            },
+                            onFailure = { falha ->
+                                Log.w(TAG, "observarUsuarioFirestore: Não foi possível reparar o código do paciente para UID $uidFinal: ${falha.message}")
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -114,6 +156,7 @@ class AuthViewModel(
             resultado.fold(
                 onSuccess = { usuario ->
                     Log.d(TAG, "login: Sucesso para UID: ${usuario.id}")
+                    codigosPacienteVerificados.remove(usuario.id)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -165,6 +208,7 @@ class AuthViewModel(
             resultado.fold(
                 onSuccess = { usuario ->
                     Log.d(TAG, "cadastrar: Sucesso para UID: ${usuario.id}")
+                    codigosPacienteVerificados.remove(usuario.id)
                     _uiState.update {
                         it.copy(
                             isLoading = false,

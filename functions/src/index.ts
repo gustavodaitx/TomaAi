@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import { criarPerfilPaciente as criarPerfilPacienteNoFirestore, ErroCadastroPaciente, obterIdentidadeAutenticada } from "./usuarios/cadastroPaciente";
+import { criarPerfilPaciente as criarPerfilPacienteNoFirestore, garantirCodigoPaciente as garantirCodigoPacienteNoFirestore, ErroCadastroPaciente, obterIdentidadeAutenticada } from "./usuarios/cadastroPaciente";
 import { criarClienteNoAsaas } from "./asaas/clientes";
 import { cancelarAssinaturaNoAsaas, criarAssinaturaNoAsaas } from "./asaas/assinaturas";
 import { obterPixDaCobranca, removerCobrancaPendente, sincronizarCobrancasNoAsaas } from "./asaas/cobrancas";
@@ -28,6 +28,19 @@ export const criarPerfilPaciente = functions.https.onCall(async (data, context) 
     }
     console.error("Falha inesperada ao criar perfil de paciente.", error);
     throw new functions.https.HttpsError("internal", "Não foi possível concluir o cadastro. Tente novamente.");
+  }
+});
+
+export const garantirCodigoPaciente = functions.https.onCall(async (_data, context) => {
+  try {
+    const identidade = obterIdentidadeAutenticada(context.auth);
+    return { codigoPaciente: await garantirCodigoPacienteNoFirestore(identidade.uid, db) };
+  } catch (error) {
+    if (error instanceof ErroCadastroPaciente) {
+      throw new functions.https.HttpsError(error.codigo, error.message);
+    }
+    console.error("Falha inesperada ao garantir o código do paciente.", error);
+    throw new functions.https.HttpsError("internal", "Não foi possível gerar o código. Tente novamente.");
   }
 });
 
