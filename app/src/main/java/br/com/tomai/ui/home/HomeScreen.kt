@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,9 +35,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import br.com.tomai.ui.components.TomaAiLogo
@@ -63,6 +69,8 @@ fun HomeScreen(
     val auth by viewModel.uiState.collectAsState()
     val doses by doseViewModel.uiState.collectAsState()
     val assinatura by assinaturaViewModel.uiState.collectAsState()
+    val clipboardManager = LocalClipboardManager.current
+    var codigoCopiado by remember { mutableStateOf(false) }
     val nome = auth.usuario?.nome?.substringBefore(' ')?.ifBlank { "Olá" } ?: "Olá"
     val uid = auth.firestoreUid ?: auth.usuario?.id?.takeIf(String::isNotBlank)
         ?: viewModel.obterUidAutenticado().orEmpty()
@@ -105,6 +113,57 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text("Acompanhe sua rotina e as confirmações de doses de hoje.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+
+            if (auth.usuario?.perfil == br.com.tomai.model.Usuario.PERFIL_PACIENTE) {
+                val codigoPaciente = auth.usuario?.codigoPaciente ?: auth.usuario?.codigoVinculo
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Seu Código de Vínculo", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        if (codigoPaciente.isNullOrBlank()) {
+                            Text("Carregando seu código…", style = MaterialTheme.typography.bodyMedium)
+                        } else {
+                            Text(codigoPaciente, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("Compartilhe este código com sua Pessoa de Confiança.", style = MaterialTheme.typography.bodyMedium)
+                            Button(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(codigoPaciente))
+                                    codigoCopiado = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (codigoCopiado) "Código copiado" else "Copiar código")
+                            }
+                        }
+                    }
+                }
+            }
+            if (auth.usuario?.perfil == br.com.tomai.model.Usuario.PERFIL_PESSOA_DE_CONFIANCA) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Pessoa de Confiança", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = auth.usuario?.codigoPacienteDigitado?.let { "Código vinculado: $it" }
+                                ?: "Conta vinculada ao paciente.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = if (auth.usuario?.aceitouReceberAvisos == true) "Avisos de doses ativados" else "Avisos de doses desativados",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
 

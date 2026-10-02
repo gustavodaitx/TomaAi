@@ -37,7 +37,10 @@ data class Usuario(
     var responsavelPadraoId: String? = null,
 
     val codigoVinculo: String? = null,
-    val pacienteUid: String? = null
+    val pacienteUid: String? = null,
+    val codigoPaciente: String? = null,
+    val codigoPacienteDigitado: String? = null,
+    val aceitouReceberAvisos: Boolean = true
 ) {
     companion object {
         const val PERFIL_PACIENTE = "PACIENTE"
@@ -83,8 +86,11 @@ data class Usuario(
                 criadoEm = criadoEm ?: Timestamp.now(),
                 asaasCustomerId = data["asaasCustomerId"] as? String,
                 responsavelPadraoId = data["responsavelPadraoId"] as? String,
-                codigoVinculo = data["codigoVinculo"] as? String,
-                pacienteUid = data["pacienteUid"] as? String
+                codigoVinculo = data["codigoVinculo"] as? String ?: data["codigoPaciente"] as? String,
+                pacienteUid = data["pacienteUid"] as? String,
+                codigoPaciente = data["codigoPaciente"] as? String ?: data["codigoVinculo"] as? String,
+                codigoPacienteDigitado = data["codigoPacienteDigitado"] as? String,
+                aceitouReceberAvisos = data["aceitouReceberAvisos"] as? Boolean ?: true
             )
         }
     }
@@ -101,10 +107,14 @@ data class Usuario(
         if (telefone.isNotBlank()) {
             map["telefone"] = telefone
         }
-        if (codigoVinculo != null) {
-            map["codigoVinculo"] = codigoVinculo
+        val codigoPacienteSalvo = codigoPaciente ?: codigoVinculo
+        if (codigoPacienteSalvo != null) {
+            map["codigoVinculo"] = codigoPacienteSalvo
+            map["codigoPaciente"] = codigoPacienteSalvo
         }
         if (pacienteUid != null) map["pacienteUid"] = pacienteUid
+        if (codigoPacienteDigitado != null) map["codigoPacienteDigitado"] = codigoPacienteDigitado
+        if (perfil == PERFIL_PESSOA_DE_CONFIANCA) map["aceitouReceberAvisos"] = aceitouReceberAvisos
         if (asaasCustomerId != null) {
             map["asaasCustomerId"] = asaasCustomerId
         }

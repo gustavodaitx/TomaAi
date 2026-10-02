@@ -10,16 +10,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ca9146bd-de5e-4db9-aa4f-6c8e74d5dc49" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gradle/8.7/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/executionHistory/executionHistory.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.bin" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.bin" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/AuthRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/AuthRepository.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/AuthRepositoryImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/AuthRepositoryImpl.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/model/Usuario.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/model/Usuario.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/cadastro/CadastroScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/cadastro/CadastroScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/home/HomeScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/home/HomeScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/AuthViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/AuthViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/functions/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/test/java/br/com/tomai/viewmodel/AuthViewModelTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/test/java/br/com/tomai/viewmodel/AuthViewModelTest.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/functions/src/usuarios/cadastroPaciente.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/usuarios/cadastroPaciente.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/functions/src/usuarios/cadastroPessoaDeConfianca.ts" beforeDir="false" afterPath="$PROJECT_DIR$/functions/src/usuarios/cadastroPessoaDeConfianca.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

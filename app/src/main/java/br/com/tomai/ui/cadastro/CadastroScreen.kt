@@ -356,6 +356,7 @@ fun CadastroScreen(
                             senha = senha,
                             confirmacaoSenha = confirmacaoSenha,
                             codigoPaciente = codigoPaciente.takeIf { cadastroPessoaDeConfianca },
+                            cadastroPessoaDeConfianca = cadastroPessoaDeConfianca,
                         )
                     }
                 )
@@ -376,6 +377,7 @@ fun CadastroScreen(
                         senha = senha,
                         confirmacaoSenha = confirmacaoSenha,
                         codigoPaciente = codigoPaciente.takeIf { cadastroPessoaDeConfianca },
+                        cadastroPessoaDeConfianca = cadastroPessoaDeConfianca,
                     )
                 }
             )

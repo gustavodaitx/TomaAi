@@ -298,7 +298,7 @@ class FakeAuthRepository : AuthRepository {
         return Result.success(user)
     }
 
-    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String): Result<Usuario> {
+    override suspend fun cadastrar(nome: String, telefone: String, email: String, senha: String, codigoPaciente: String?): Result<Usuario> {
         quantidadeChamadasCadastro += 1
         bloqueioCadastro?.await()
         falhaCadastro?.let { return Result.failure(it) }

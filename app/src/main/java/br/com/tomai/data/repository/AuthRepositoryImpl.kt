@@ -278,14 +278,15 @@ class AuthRepositoryImpl(
                 .await()
             val dadosPerfil = resultadoFuncao.data as? Map<*, *>
                 ?: throw IllegalStateException("Resposta invalida ao concluir cadastro.")
-            val codigoVinculo = dadosPerfil["codigoVinculo"] as? String
+            val codigoVinculo = (dadosPerfil["codigoPaciente"] as? String) ?: (dadosPerfil["codigoVinculo"] as? String)
             val pacienteUid = dadosPerfil["pacienteUid"] as? String
+            val codigoPacienteDigitadoSalvo = dadosPerfil["codigoPacienteDigitado"] as? String
             val nomeSalvo = dadosPerfil["nome"] as? String
             val telefoneSalvo = dadosPerfil["telefone"] as? String
             val emailSalvo = dadosPerfil["email"] as? String
             val perfilEsperado = if (pessoaDeConfianca) Usuario.PERFIL_PESSOA_DE_CONFIANCA else Usuario.PERFIL_PACIENTE
             if (nomeSalvo == null || telefoneSalvo == null || emailSalvo == null || dadosPerfil["perfil"] != perfilEsperado ||
-                (pessoaDeConfianca && (pacienteUid.isNullOrBlank() || codigoVinculo != null)) ||
+                (pessoaDeConfianca && (pacienteUid.isNullOrBlank() || codigoPacienteDigitadoSalvo.isNullOrBlank() || codigoVinculo != null)) ||
                 (!pessoaDeConfianca && codigoVinculo.isNullOrBlank())) {
                 throw IllegalStateException("Resposta invalida ao concluir cadastro.")
             }
@@ -300,7 +301,10 @@ class AuthRepositoryImpl(
                     ativo = true,
                     criadoEm = Timestamp.now(),
                     codigoVinculo = codigoVinculo,
-                    pacienteUid = pacienteUid
+                    pacienteUid = pacienteUid,
+                    codigoPaciente = codigoVinculo,
+                    codigoPacienteDigitado = codigoPacienteDigitadoSalvo,
+                    aceitouReceberAvisos = dadosPerfil["aceitouReceberAvisos"] as? Boolean ?: true
                 )
             )
         } catch (e: Exception) {
@@ -423,9 +427,22 @@ class AuthRepositoryImpl(
 
                 objeto.copy(
                     id = if (objeto.id.isNotBlank()) objeto.id else uid,
-                    nome = nomeSeguro,
-                    email = emailSeguro,
-                    criadoEm = objeto.criadoEm ?: extrairTimestampSeguro(snapshot, "criadoEm")
+                    nome = (snapshot.get("nome") as? String)?.takeIf { it.isNotBlank() } ?: nomeSeguro,
+                    telefone = (snapshot.get("telefone") as? String) ?: objeto.telefone,
+                    email = (snapshot.get("email") as? String)?.takeIf { it.isNotBlank() } ?: emailSeguro,
+                    perfil = (snapshot.get("perfil") as? String) ?: objeto.perfil,
+                    ativo = (snapshot.get("ativo") as? Boolean) ?: objeto.ativo,
+                    codigoVinculo = (snapshot.get("codigoPaciente") as? String)
+                        ?: (snapshot.get("codigoVinculo") as? String)
+                        ?: objeto.codigoVinculo,
+                    codigoPaciente = (snapshot.get("codigoPaciente") as? String)
+                        ?: (snapshot.get("codigoVinculo") as? String)
+                        ?: objeto.codigoPaciente
+                        ?: objeto.codigoVinculo,
+                    codigoPacienteDigitado = (snapshot.get("codigoPacienteDigitado") as? String) ?: objeto.codigoPacienteDigitado,
+                    pacienteUid = (snapshot.get("pacienteUid") as? String) ?: objeto.pacienteUid,
+                    aceitouReceberAvisos = (snapshot.get("aceitouReceberAvisos") as? Boolean) ?: objeto.aceitouReceberAvisos,
+                    criadoEm = extrairTimestampSeguro(snapshot, "criadoEm")
                 )
             } else {
                 criarUsuarioDeSnapshot(snapshot, uid, defaultEmail, defaultNome)

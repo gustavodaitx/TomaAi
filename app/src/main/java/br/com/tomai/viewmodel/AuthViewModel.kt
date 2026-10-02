@@ -146,11 +146,12 @@ class AuthViewModel(
         senha: String,
         confirmacaoSenha: String,
         codigoPaciente: String? = null,
+        cadastroPessoaDeConfianca: Boolean = false,
         onSucesso: () -> Unit = {}
     ) {
         if (_uiState.value.isLoading) return
 
-        val erroValidacao = validarCamposCadastro(nome, telefone, email, senha, confirmacaoSenha, codigoPaciente)
+        val erroValidacao = validarCamposCadastro(nome, telefone, email, senha, confirmacaoSenha, codigoPaciente, cadastroPessoaDeConfianca)
         if (erroValidacao != null) {
             _uiState.update { it.copy(erro = erroValidacao) }
             return
@@ -266,7 +267,8 @@ class AuthViewModel(
         email: String,
         senha: String,
         confirmacaoSenha: String,
-        codigoPaciente: String? = null
+        codigoPaciente: String? = null,
+        cadastroPessoaDeConfianca: Boolean = false
     ): String? {
         if (nome.isBlank() || nome.trim().length < 2) {
             return "O nome deve conter pelo menos 2 caracteres."
@@ -286,8 +288,11 @@ class AuthViewModel(
         if (senha != confirmacaoSenha) {
             return "As senhas não coincidem."
         }
-        if (!codigoPaciente.isNullOrBlank() && !Regex("^TMA-[A-Z2-9]{6}$").matches(codigoPaciente.trim().uppercase())) {
-            return "Informe um código de paciente válido (ex.: TMA-ABC123)."
+        if (cadastroPessoaDeConfianca && codigoPaciente.isNullOrBlank()) {
+            return "Informe o código do paciente."
+        }
+        if (cadastroPessoaDeConfianca && !Regex("^TMA-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$").matches(codigoPaciente.orEmpty().trim().uppercase())) {
+            return "Informe um código de paciente válido (ex.: TMA-7K4P92)."
         }
         return null
     }

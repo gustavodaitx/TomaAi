@@ -32,6 +32,7 @@ export function obterIdentidadeAutenticada(
 
 export interface PerfilPacienteCriado {
   codigoVinculo: string;
+  codigoPaciente: string;
   nome: string;
   telefone: string;
   email: string;
@@ -74,8 +75,10 @@ export async function criarPerfilPaciente(
       const usuarioSnapshot = await transaction.get(usuarioRef);
       const usuarioExistente = usuarioSnapshot.data();
       if (usuarioSnapshot.exists && usuarioExistente?.perfil === "PACIENTE" &&
-        typeof usuarioExistente.codigoVinculo === "string" && usuarioExistente.codigoVinculo.trim()) {
-        const codigoExistenteRef = firestore.collection("codigos_vinculo_pacientes").doc(usuarioExistente.codigoVinculo);
+        typeof (usuarioExistente.codigoPaciente || usuarioExistente.codigoVinculo) === "string" &&
+        String(usuarioExistente.codigoPaciente || usuarioExistente.codigoVinculo).trim()) {
+        const codigoExistente = String(usuarioExistente.codigoPaciente || usuarioExistente.codigoVinculo);
+        const codigoExistenteRef = firestore.collection("codigos_vinculo_pacientes").doc(codigoExistente);
         const codigoExistenteSnapshot = await transaction.get(codigoExistenteRef);
         if (codigoExistenteSnapshot.exists && codigoExistenteSnapshot.data()?.pacienteUid !== uid) {
           throw new ErroCadastroPaciente("already-exists", "O código de vínculo não está disponível.");
@@ -86,11 +89,21 @@ export async function criarPerfilPaciente(
             criadoEm: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
+        transaction.set(usuarioRef, {
+          nome,
+          telefone,
+          email: emailNormalizado,
+          perfil: "PACIENTE",
+          ativo: true,
+          codigoVinculo: codigoExistente,
+          codigoPaciente: codigoExistente,
+        }, { merge: true });
         return {
-          codigoVinculo: usuarioExistente.codigoVinculo,
-          nome: typeof usuarioExistente.nome === "string" ? usuarioExistente.nome : nome,
-          telefone: typeof usuarioExistente.telefone === "string" ? usuarioExistente.telefone : "",
-          email: typeof usuarioExistente.email === "string" ? usuarioExistente.email : emailNormalizado,
+          codigoVinculo: codigoExistente,
+          codigoPaciente: codigoExistente,
+          nome,
+          telefone,
+          email: emailNormalizado,
           perfil: "PACIENTE",
         };
       }
@@ -116,6 +129,7 @@ export async function criarPerfilPaciente(
         ativo: true,
         criadoEm: admin.firestore.FieldValue.serverTimestamp(),
         codigoVinculo,
+        codigoPaciente: codigoVinculo,
       };
       if (usuarioSnapshot.exists) {
         transaction.update(usuarioRef, {
@@ -125,11 +139,12 @@ export async function criarPerfilPaciente(
           perfil: "PACIENTE",
           ativo: true,
           codigoVinculo,
+          codigoPaciente: codigoVinculo,
         });
       } else {
         transaction.create(usuarioRef, perfil);
       }
-      return { codigoVinculo, nome, telefone, email: emailNormalizado, perfil: "PACIENTE" };
+      return { codigoVinculo, codigoPaciente: codigoVinculo, nome, telefone, email: emailNormalizado, perfil: "PACIENTE" };
     });
     if (resultado) return resultado;
   }

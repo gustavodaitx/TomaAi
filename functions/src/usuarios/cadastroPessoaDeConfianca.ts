@@ -19,7 +19,7 @@ export async function criarPerfilPessoaDeConfianca(
   const codigo = typeof registro.codigoPaciente === "string" ? registro.codigoPaciente.trim().toUpperCase() : "";
   const emailNormalizado = email.trim();
   if (!uid.trim() || !emailNormalizado) throw new ErroCadastroPessoaDeConfianca("unauthenticated", "Faça login para continuar.");
-  if (nome.length < 2 || telefone.replace(/\D/g, "").length < 10 || !/^TMA-[A-Z2-9]{6}$/.test(codigo)) {
+  if (nome.length < 2 || telefone.replace(/\D/g, "").length < 10 || !/^TMA-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(codigo)) {
     throw new ErroCadastroPessoaDeConfianca("invalid-argument", "Informe nome, telefone e código do paciente válidos.");
   }
 
@@ -35,12 +35,37 @@ export async function criarPerfilPessoaDeConfianca(
     if (usuarioSnapshot.exists) {
       const existente = usuarioSnapshot.data();
       if (existente?.perfil === "PESSOA_DE_CONFIANCA" && existente.pacienteUid === pacienteUid) {
-        return { nome: existente.nome, telefone: existente.telefone, email: existente.email, perfil: "PESSOA_DE_CONFIANCA", pacienteUid };
+        const aceitouReceberAvisos = typeof existente.aceitouReceberAvisos === "boolean" ? existente.aceitouReceberAvisos : true;
+        transaction.set(usuarioRef, { codigoPacienteDigitado: codigo, aceitouReceberAvisos }, { merge: true });
+        return {
+          nome: existente.nome,
+          telefone: existente.telefone,
+          email: existente.email,
+          perfil: "PESSOA_DE_CONFIANCA",
+          codigoPacienteDigitado: codigo,
+          pacienteUid,
+          aceitouReceberAvisos,
+        };
       }
-      throw new ErroCadastroPessoaDeConfianca("already-exists", "O perfil deste usuário já foi criado.");
+      const perfilProvisorio = existente?.perfil === "PACIENTE" &&
+        !existente.codigoVinculo && !existente.codigoPaciente;
+      if (!perfilProvisorio) {
+        throw new ErroCadastroPessoaDeConfianca("already-exists", "O perfil deste usuário já foi criado.");
+      }
     }
-    const perfil = { id: uid, nome, telefone, email: emailNormalizado, perfil: "PESSOA_DE_CONFIANCA", pacienteUid, ativo: true, criadoEm: admin.firestore.FieldValue.serverTimestamp() };
-    transaction.create(usuarioRef, perfil);
-    return { nome, telefone, email: emailNormalizado, perfil: "PESSOA_DE_CONFIANCA", pacienteUid };
+    const perfil = {
+      id: uid,
+      nome,
+      telefone,
+      email: emailNormalizado,
+      perfil: "PESSOA_DE_CONFIANCA",
+      codigoPacienteDigitado: codigo,
+      pacienteUid,
+      aceitouReceberAvisos: true,
+      ativo: true,
+      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    transaction.set(usuarioRef, perfil, { merge: true });
+    return { nome, telefone, email: emailNormalizado, perfil: "PESSOA_DE_CONFIANCA", codigoPacienteDigitado: codigo, pacienteUid, aceitouReceberAvisos: true };
   });
 }
