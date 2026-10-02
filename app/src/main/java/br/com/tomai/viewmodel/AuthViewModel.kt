@@ -335,7 +335,7 @@ class AuthViewModel(
         if (cadastroPessoaDeConfianca && codigoPaciente.isNullOrBlank()) {
             return "Informe o código do paciente."
         }
-        if (cadastroPessoaDeConfianca && !Regex("^TMA-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$").matches(codigoPaciente.orEmpty().trim().uppercase())) {
+        if (cadastroPessoaDeConfianca && !Regex("^TMA-[A-Z0-9]{6}$").matches(codigoPaciente.orEmpty().trim().uppercase())) {
             return "Informe um código de paciente válido (ex.: TMA-7K4P92)."
         }
         return null

@@ -19,7 +19,7 @@ export async function criarPerfilPessoaDeConfianca(
   const codigo = typeof registro.codigoPaciente === "string" ? registro.codigoPaciente.trim().toUpperCase() : "";
   const emailNormalizado = email.trim();
   if (!uid.trim() || !emailNormalizado) throw new ErroCadastroPessoaDeConfianca("unauthenticated", "Faça login para continuar.");
-  if (nome.length < 2 || telefone.replace(/\D/g, "").length < 10 || !/^TMA-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(codigo)) {
+  if (nome.length < 2 || telefone.replace(/\D/g, "").length < 10 || !/^TMA-[A-Z0-9]{6}$/.test(codigo)) {
     throw new ErroCadastroPessoaDeConfianca("invalid-argument", "Informe nome, telefone e código do paciente válidos.");
   }
 

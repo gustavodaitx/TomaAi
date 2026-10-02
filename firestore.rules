@@ -1,167 +1,157 @@
 rules_version = '2';
+
 service cloud.firestore {
+
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function owns(userId) { return signedIn() && request.auth.uid == userId; }
+
+    // ============================================================
+    // FUNÇÕES GERAIS
+    // ============================================================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
     function ownsExisting() {
       return signedIn() && resource.data.usuarioId == request.auth.uid;
     }
 
-    function codigoPacienteRef(codigo) {
-      return /databases/$(database)/documents/codigos_vinculo_pacientes/$(codigo);
+    // ============================================================
+    // PERFIL DO USUÁRIO
+    // ============================================================
+
+    function perfilAtual() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil;
     }
 
-    function pacienteRef(pacienteUid) {
-      return /databases/$(database)/documents/usuarios/$(pacienteUid);
+    function ehPaciente() {
+      return signedIn() && perfilAtual() == 'PACIENTE';
     }
 
-    function codigoVinculoValido(userId, data) {
-      let codigo = data.get('codigoPaciente', null);
-      return codigo is string
-        && codigo.matches('TMA-[A-HJ-NP-Z2-9]{6}')
-        && data.get('codigoVinculo', null) == codigo
-        && exists(codigoPacienteRef(codigo))
-        && get(codigoPacienteRef(codigo)).data.get('pacienteUid', null) == userId;
+    function ehCuidador() {
+      return signedIn() && (perfilAtual() == 'CUIDADOR' || perfilAtual() == 'PESSOA_DE_CONFIANCA');
     }
 
-    function codigoVinculoOpcionalValido(userId, data) {
-      let codigo = data.get('codigoPaciente', null);
-      let codigoLegado = data.get('codigoVinculo', null);
-      return (codigo == null && codigoLegado == null)
-        || codigoVinculoValido(userId, data);
+    // ============================================================
+    // VÍNCULO PACIENTE / PESSOA DE CONFIANÇA
+    // ============================================================
+
+    function cuidadorVinculado(pacienteUid) {
+      let vinculoPath = /databases/$(database)/documents/vinculos/$(pacienteUid + '_' + request.auth.uid);
+      return ehCuidador() && exists(vinculoPath) && get(vinculoPath).data.ativo == true;
     }
 
-    function vinculoPessoaDeConfiancaValido(data) {
-      let codigo = data.get('codigoPacienteDigitado', null);
-      let pacienteUid = data.get('pacienteUid', null);
-      return codigo is string
-        && codigo.matches('TMA-[A-HJ-NP-Z2-9]{6}')
-        && pacienteUid is string
-        && exists(codigoPacienteRef(codigo))
-        && get(codigoPacienteRef(codigo)).data.get('pacienteUid', null) == pacienteUid
-        && exists(pacienteRef(pacienteUid))
-        && get(pacienteRef(pacienteUid)).data.get('perfil', null) == 'PACIENTE';
-    }
-
-    function camposUsuarioValidos(userId, data) {
-      return data.keys().hasOnly([
-          'id', 'nome', 'telefone', 'email', 'perfil', 'ativo', 'criadoEm',
-          'asaasCustomerId', 'responsavelPadraoId', 'codigoVinculo', 'pacienteUid',
-          'codigoPaciente', 'codigoPacienteDigitado', 'aceitouReceberAvisos'
-        ])
-        && data.get('id', null) == userId
-        && data.get('nome', null) is string
-        && data.get('telefone', '') is string
-        && data.get('email', null) is string
-        && data.get('perfil', null) in ['PACIENTE', 'PESSOA_DE_CONFIANCA']
-        && data.get('ativo', null) is bool
-        && data.get('criadoEm', null) is timestamp
-        && (data.get('asaasCustomerId', null) == null || data.get('asaasCustomerId', null) is string)
-        && (data.get('responsavelPadraoId', null) == null || data.get('responsavelPadraoId', null) is string)
-        && (data.get('aceitouReceberAvisos', null) == null || data.get('aceitouReceberAvisos', null) is bool);
-    }
-
-    function camposPerfilValidos(userId, data) {
-      return data.perfil == 'PACIENTE'
-        ? codigoVinculoOpcionalValido(userId, data)
-          && data.get('pacienteUid', null) == null
-          && data.get('codigoPacienteDigitado', null) == null
-          && data.get('aceitouReceberAvisos', null) == null
-        : vinculoPessoaDeConfiancaValido(data)
-          && data.get('codigoPaciente', null) == null
-          && data.get('codigoVinculo', null) == null
-          && data.get('aceitouReceberAvisos', null) is bool;
-    }
-
-    function camposImutaveisUsuarioIguais() {
-      return request.resource.data.get('id', null) == resource.data.get('id', null)
-        && request.resource.data.perfil == resource.data.perfil
-        && request.resource.data.ativo == resource.data.ativo
-        && request.resource.data.criadoEm == resource.data.criadoEm
-        && request.resource.data.get('asaasCustomerId', null) == resource.data.get('asaasCustomerId', null);
-    }
+    // ============================================================
+    // USUÁRIOS
+    // ============================================================
 
     match /usuarios/{userId} {
-      allow read: if owns(userId);
+
+      allow read: if signedIn();
+
+      // Permite a criação do próprio documento de usuário autenticado
       allow create: if owns(userId)
-        && camposUsuarioValidos(userId, request.resource.data)
-        && request.resource.data.keys().hasAll(['id', 'nome', 'email', 'perfil', 'ativo', 'criadoEm'])
-        && camposPerfilValidos(userId, request.resource.data);
-      allow update: if owns(userId)
-        && camposUsuarioValidos(userId, request.resource.data)
-        && camposImutaveisUsuarioIguais()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'nome', 'telefone', 'email', 'responsavelPadraoId', 'codigoVinculo',
-          'codigoPaciente', 'pacienteUid', 'codigoPacienteDigitado', 'aceitouReceberAvisos'
-        ])
-        && camposPerfilValidos(userId, request.resource.data)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['responsavelPadraoId'])
-          || request.resource.data.responsavelPadraoId == null
-          || get(/databases/$(database)/documents/pessoas_confianca/$(request.resource.data.responsavelPadraoId)).data.usuarioId == userId);
+        && request.resource.data.id == userId
+        && request.resource.data.perfil in ['PACIENTE', 'PESSOA_DE_CONFIANCA', 'CUIDADOR'];
+
+      // Permite atualização pelo próprio dono do perfil
+      allow update: if owns(userId);
+
       allow delete: if false;
     }
+
+
+    // ============================================================
+    // MEDICAMENTOS
+    // ============================================================
 
     match /medicamentos/{medicamentoId} {
       allow read: if ownsExisting();
       allow create: if signedIn() && request.resource.data.usuarioId == request.auth.uid;
-      allow update: if ownsExisting()
-        && request.resource.data.usuarioId == resource.data.usuarioId;
+      allow update: if ownsExisting() && request.resource.data.usuarioId == resource.data.usuarioId;
       allow delete: if ownsExisting();
     }
+
+
+    // ============================================================
+    // HORÁRIOS DOS MEDICAMENTOS
+    // ============================================================
+
+    match /horarios_medicamentos/{horarioId} {
+      allow read: if ownsExisting();
+
+      allow create: if signedIn()
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.medicamentoId is string
+        && exists(/databases/$(database)/documents/medicamentos/$(request.resource.data.medicamentoId))
+        && get(/databases/$(database)/documents/medicamentos/$(request.resource.data.medicamentoId)).data.usuarioId == request.auth.uid;
+
+      allow update: if ownsExisting()
+        && request.resource.data.usuarioId == resource.data.usuarioId
+        && request.resource.data.medicamentoId == resource.data.medicamentoId;
+
+      allow delete: if ownsExisting();
+    }
+
+
+    // ============================================================
+    // DOSES
+    // ============================================================
 
     match /doses/{doseId} {
       allow read: if ownsExisting();
       allow create: if signedIn() && request.resource.data.usuarioId == request.auth.uid;
       allow update: if ownsExisting()
         && request.resource.data.usuarioId == resource.data.usuarioId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'confirmadaEm', 'medicamentoNome', 'nomeMedicamento', 'dosagem'
-        ])
-        && request.resource.data.status in [
-          'PENDENTE', 'CONFIRMADA', 'IGNORADA', 'NAO_CONFIRMADA'
-        ];
+        && request.resource.data.status in ['PENDENTE', 'CONFIRMADA', 'IGNORADA', 'NAO_CONFIRMADA'];
       allow delete: if ownsExisting();
     }
 
+
+    // ============================================================
+    // PESSOAS DE CONFIANÇA
+    // ============================================================
+
     match /pessoas_confianca/{pessoaId} {
       allow read, delete: if ownsExisting();
+
       allow create: if signedIn()
-        && request.resource.data.usuarioId == request.auth.uid
-        && request.resource.data.keys().hasOnly([
-          'id', 'usuarioId', 'nome', 'email', 'telefone', 'aceitouReceberAvisos'
-        ])
-        && request.resource.data.aceitouReceberAvisos is bool;
+        && request.resource.data.usuarioId == request.auth.uid;
+
       allow update: if ownsExisting()
-        && request.resource.data.usuarioId == resource.data.usuarioId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'nome', 'email', 'telefone', 'aceitouReceberAvisos'
-        ])
-        && request.resource.data.aceitouReceberAvisos is bool;
+        && request.resource.data.usuarioId == resource.data.usuarioId;
     }
 
-    match /planos/{planoId} {
+
+    // ============================================================
+    // CÓDIGOS DE VÍNCULO
+    // ============================================================
+
+    match /codigos_vinculo/{codigoId} {
       allow read: if signedIn();
-      allow write: if false;
+      allow create: if signedIn();
+      allow update, delete: if signedIn();
     }
 
-    match /assinaturas/{assinaturaId} {
-      allow read: if ownsExisting();
-      allow write: if false;
+
+    // ============================================================
+    // VÍNCULOS
+    // ============================================================
+
+    match /vinculos/{vinculoId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if false;
     }
 
-    match /cobrancas/{cobrancaId} {
-      allow read: if ownsExisting();
-      allow write: if false;
-    }
 
-    match /alertas/{alertaId} {
-      allow read: if ownsExisting();
-      allow write: if false;
-    }
-
-    match /eventos_webhook/{eventoId} {
-      allow read, write: if false;
-    }
+    // ============================================================
+    // BLOQUEIO PADRÃO
+    // ============================================================
 
     match /{document=**} {
       allow read, write: if false;
