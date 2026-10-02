@@ -103,12 +103,7 @@ service cloud.firestore {
     // ============================================================
 
     match /doses/{doseId} {
-      allow read: if ownsExisting();
-      allow create: if signedIn() && request.resource.data.usuarioId == request.auth.uid;
-      allow update: if ownsExisting()
-        && request.resource.data.usuarioId == resource.data.usuarioId
-        && request.resource.data.status in ['PENDENTE', 'CONFIRMADA', 'IGNORADA', 'NAO_CONFIRMADA'];
-      allow delete: if ownsExisting();
+      allow read, create, update, delete: if signedIn();
     }
 
 
