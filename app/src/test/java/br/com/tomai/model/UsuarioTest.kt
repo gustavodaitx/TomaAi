@@ -1,3 +1,4 @@
+
 package br.com.tomai.model
 
 import com.google.firebase.Timestamp
