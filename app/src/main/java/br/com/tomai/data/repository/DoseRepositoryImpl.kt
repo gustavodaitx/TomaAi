@@ -104,6 +104,18 @@ class DoseRepositoryImpl(
             if (medicamentos.any { it.ativo && it.usuarioId != authenticatedUid }) {
                 return Result.failure(IllegalStateException("A agenda contém medicamentos de outro usuário."))
             }
+
+            // Evita get() em IDs que ainda não existem: a regra de leitura depende de
+            // resource.data.usuarioId e pode negar a leitura de um documento ausente.
+            // Esta consulta só pode retornar doses do usuário autenticado.
+            val dosesExistentes = firestore.collection(COLECAO_DOSES)
+                .whereEqualTo("usuarioId", authenticatedUid)
+                .whereEqualTo("dataAgenda", dataAgenda)
+                .get()
+                .await()
+                .documents
+                .associateBy { it.id }
+
             var batch = firestore.batch()
             var operacoes = 0
 
@@ -123,8 +135,7 @@ class DoseRepositoryImpl(
                         horarioProgramado = horario.hora
                     )
                     val docRef = firestore.collection(COLECAO_DOSES).document(doseId)
-                    val snapshot = docRef.get().await()
-                    if (!snapshot.exists()) {
+                    if (doseId !in dosesExistentes) {
                         val dose = Dose(
                             id = doseId,
                             usuarioId = authenticatedUid,
