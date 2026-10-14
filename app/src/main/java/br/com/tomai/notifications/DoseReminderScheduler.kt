@@ -4,54 +4,246 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.util.Log
 import br.com.tomai.model.Dose
+import br.com.tomai.model.Medicamento
+import org.json.JSONArray
+import org.json.JSONObject
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 
+/** Mantém os alarmes locais sincronizados com a agenda do usuário autenticado neste aparelho. */
 object DoseReminderScheduler {
+    private const val TAG = "TOMAI_NOTIFICACOES"
+    private const val PREFS = "lembretes_medicamentos"
+    private const val KEY_SCHEDULES = "agendamentos"
 
-    fun reagendarPendentes(context: Context, doses: List<Dose>) {
+    fun sincronizar(
+        context: Context,
+        uidDoDispositivo: String,
+        doses: List<Dose>,
+        medicamentos: List<Medicamento>
+    ) {
+        if (uidDoDispositivo.isBlank()) return
+        val appContext = context.applicationContext
+        doses.forEach { dose -> cancelarAgendamentoLegado(appContext, dose.id) }
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val all = readAll(prefs)
+        val previous = all.optJSONArray(uidDoDispositivo) ?: JSONArray()
+        val now = System.currentTimeMillis()
+        val desired = LinkedHashMap<String, JSONObject>()
+
+        val dosesParaAgendar = construirJanela(doses, medicamentos)
+        dosesParaAgendar.asSequence()
+            .filter { it.status == Dose.STATUS_PENDENTE && it.id.isNotBlank() }
+            .forEach { dose ->
+                val trigger = triggerMillis(dose) ?: return@forEach
+                if (trigger <= now) return@forEach
+                desired[dose.id] = JSONObject()
+                    .put("doseId", dose.id)
+                    .put("usuarioId", dose.usuarioId)
+                    .put("nome", dose.medicamentoNome)
+                    .put("dosagem", dose.dosagem)
+                    .put("horario", dose.horarioProgramado)
+                    .put("data", dose.dataAgenda)
+            }
+
+        for (index in 0 until previous.length()) {
+            val old = previous.optJSONObject(index) ?: continue
+            val id = old.optString("doseId")
+            val new = desired[id]
+            if (new == null || !sameSchedule(old, new)) {
+                cancelar(appContext, uidDoDispositivo, id)
+            }
+        }
+
+        val next = JSONArray()
+        desired.values.forEach { schedule ->
+            val doseId = schedule.getString("doseId")
+            val existing = (0 until previous.length())
+                .mapNotNull(previous::optJSONObject)
+                .firstOrNull { it.optString("doseId") == doseId && sameSchedule(it, schedule) }
+            val toSchedule = existing ?: schedule
+            agendar(appContext, uidDoDispositivo, toSchedule)
+            next.put(toSchedule)
+        }
+        all.put(uidDoDispositivo, next)
+        prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
+        Log.d(TAG, "Agenda local sincronizada: ${desired.size} lembrete(s) para a conta ativa.")
+    }
+
+    /** Recria somente alarmes ainda futuros da conta salva neste aparelho. */
+    fun restaurar(context: Context) {
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val all = readAll(prefs)
+        val now = System.currentTimeMillis()
+        for (userIndex in 0 until all.length()) {
+            val uid = all.names()?.optString(userIndex).orEmpty()
+            if (uid.isBlank()) continue
+            val old = all.optJSONArray(uid) ?: continue
+            val valid = JSONArray()
+            for (index in 0 until old.length()) {
+                val schedule = old.optJSONObject(index) ?: continue
+                val trigger = triggerMillis(schedule) ?: continue
+                if (trigger <= now) continue
+                agendar(appContext, uid, schedule)
+                valid.put(schedule)
+            }
+            all.put(uid, valid)
+        }
+        prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
+        Log.d(TAG, "Alarmes locais futuros restaurados após evento do sistema.")
+    }
+
+    private fun agendar(context: Context, deviceUid: String, data: JSONObject) {
+        val trigger = triggerMillis(data) ?: return
+        if (trigger <= System.currentTimeMillis()) return
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        doses.filter { it.status == Dose.STATUS_PENDENTE }.forEach { dose ->
-            val triggerAt = calcularTriggerMillis(dose) ?: return@forEach
-            if (triggerAt <= System.currentTimeMillis()) return@forEach
-
-            val intent = Intent(context, DoseReminderReceiver::class.java).apply {
-                putExtra(DoseReminderReceiver.EXTRA_DOSE_ID, dose.id)
-                putExtra(DoseReminderReceiver.EXTRA_MEDICAMENTO_NOME, dose.medicamentoNome)
-                putExtra(DoseReminderReceiver.EXTRA_HORARIO, dose.horarioProgramado)
-            }
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                dose.id.hashCode(),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
+        val pendingIntent = pendingIntent(context, deviceUid, data, PendingIntent.FLAG_UPDATE_CURRENT)
+        try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent)
+                Log.i(TAG, "Alarme aproximado agendado; acesso a alarmes exatos indisponível.")
             } else {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    pendingIntent
-                )
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent)
             }
+        } catch (error: SecurityException) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent)
+            Log.w(TAG, "Sem autorização para alarme exato; usado agendamento aproximado.", error)
         }
     }
 
-    private fun calcularTriggerMillis(dose: Dose): Long? {
-        val data = runCatching { LocalDate.parse(dose.dataAgenda) }.getOrNull() ?: return null
-        val hora = runCatching { LocalTime.parse(dose.horarioProgramado) }.getOrNull() ?: return null
-        val dateTime = LocalDateTime.of(data, hora)
-        return dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    private fun cancelar(context: Context, deviceUid: String, doseId: String) {
+        if (doseId.isBlank()) return
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val identity = Intent(context, DoseReminderReceiver::class.java).apply {
+            action = DoseReminderReceiver.ACTION_DOSE_REMINDER
+            data = uri(deviceUid, doseId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            0,
+            identity,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        ) ?: return
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
+        Log.d(TAG, "Agendamento antigo cancelado.")
     }
+
+    /** Limpa PendingIntents do agendador anterior, que não usava URI própria por conta. */
+    private fun cancelarAgendamentoLegado(context: Context, doseId: String) {
+        if (doseId.isBlank()) return
+        val identity = Intent(context, DoseReminderReceiver::class.java)
+        val oldPendingIntent = PendingIntent.getBroadcast(
+            context,
+            doseId.hashCode(),
+            identity,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        ) ?: return
+        (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(oldPendingIntent)
+        oldPendingIntent.cancel()
+        Log.d(TAG, "Agendamento legado removido.")
+    }
+
+    private fun pendingIntent(
+        context: Context,
+        deviceUid: String,
+        data: JSONObject,
+        flags: Int
+    ): PendingIntent {
+        val doseId = data.getString("doseId")
+        val intent = Intent(context, DoseReminderReceiver::class.java).apply {
+            action = DoseReminderReceiver.ACTION_DOSE_REMINDER
+            this.data = uri(deviceUid, doseId)
+            putExtra(DoseReminderReceiver.EXTRA_DEVICE_UID, deviceUid)
+            putExtra(DoseReminderReceiver.EXTRA_DOSE_ID, doseId)
+            putExtra(DoseReminderReceiver.EXTRA_MEDICAMENTO_NOME, data.optString("nome"))
+            putExtra(DoseReminderReceiver.EXTRA_DOSAGEM, data.optString("dosagem"))
+            putExtra(DoseReminderReceiver.EXTRA_HORARIO, data.optString("horario"))
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            0,
+            intent,
+            flags or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun uri(deviceUid: String, doseId: String): Uri =
+        Uri.parse("tomai://lembrete/${Uri.encode(deviceUid)}/${Uri.encode(doseId)}")
+
+    private fun triggerMillis(data: JSONObject): Long? {
+        val date = runCatching { LocalDate.parse(data.optString("data")) }.getOrNull() ?: return null
+        val time = runCatching { LocalTime.parse(data.optString("horario")) }.getOrNull() ?: return null
+        return LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+
+    private fun triggerMillis(dose: Dose): Long? = triggerMillis(
+        JSONObject().put("data", dose.dataAgenda).put("horario", dose.horarioProgramado)
+    )
+
+    private fun construirJanela(doses: List<Dose>, medicamentos: List<Medicamento>): List<Dose> {
+        val hoje = runCatching { LocalDate.parse(Dose.dataHoje()) }.getOrNull() ?: return emptyList()
+        val dosesDeHoje = doses.associateBy { "${it.medicamentoId}|${it.horarioProgramado}" }
+        val resultado = mutableListOf<Dose>()
+        for (offset in 0..6) {
+            val data = hoje.plusDays(offset.toLong())
+            val dataIso = data.toString()
+            medicamentos.filter { medicamentoValidoNaData(it, data) }.forEach { medicamento ->
+                medicamento.horarios.forEach horarioLoop@ { horario ->
+                    if (runCatching { LocalTime.parse(horario.hora) }.isFailure) return@horarioLoop
+                    if (offset == 0) {
+                        val doseAtual = dosesDeHoje["${medicamento.id}|${horario.hora}"]
+                        if (doseAtual?.status != Dose.STATUS_PENDENTE) return@horarioLoop
+                        resultado += doseAtual
+                    } else {
+                        resultado += Dose(
+                            id = Dose.idDeterministico(
+                                medicamento.usuarioId,
+                                dataIso,
+                                medicamento.id,
+                                horario.hora
+                            ),
+                            usuarioId = medicamento.usuarioId,
+                            medicamentoId = medicamento.id,
+                            medicamentoNome = medicamento.nome,
+                            dosagem = medicamento.dosagem,
+                            dataAgenda = dataIso,
+                            horarioProgramado = horario.hora,
+                            status = Dose.STATUS_PENDENTE
+                        )
+                    }
+                }
+            }
+        }
+        return resultado
+    }
+
+    private fun medicamentoValidoNaData(medicamento: Medicamento, data: LocalDate): Boolean {
+        if (!medicamento.ativo || medicamento.id.isBlank() || medicamento.usuarioId.isBlank()) return false
+        val inicio = if (medicamento.dataInicio.isBlank()) null
+        else runCatching { LocalDate.parse(medicamento.dataInicio) }.getOrNull() ?: return false
+        val fim = if (medicamento.dataFim.isBlank()) null
+        else runCatching { LocalDate.parse(medicamento.dataFim) }.getOrNull() ?: return false
+        if (inicio != null && data.isBefore(inicio)) return false
+        if (fim != null && data.isAfter(fim)) return false
+        return medicamento.frequencia != Medicamento.FREQUENCIA_PERSONALIZADA ||
+            data.dayOfWeek.value in medicamento.diasSemana
+    }
+
+    private fun sameSchedule(first: JSONObject, second: JSONObject): Boolean =
+        first.optString("data") == second.optString("data") &&
+            first.optString("horario") == second.optString("horario") &&
+            first.optString("nome") == second.optString("nome") &&
+            first.optString("dosagem") == second.optString("dosagem")
+
+    private fun readAll(prefs: android.content.SharedPreferences): JSONObject =
+        runCatching { JSONObject(prefs.getString(KEY_SCHEDULES, "{}") ?: "{}") }
+            .getOrElse { JSONObject() }
 }

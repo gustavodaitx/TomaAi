@@ -1,11 +1,14 @@
 package br.com.tomai.viewmodel
 
 import br.com.tomai.model.Dose
+import br.com.tomai.model.Medicamento
 
 data class DoseUiState(
     val usuarioId: String = "",
     val dataAgenda: String = "",
     val doses: List<Dose> = emptyList(),
+    val medicamentosSincronizados: List<Medicamento> = emptyList(),
+    val medicamentoIdsValidosHoje: Set<String> = emptySet(),
     val historico: List<Dose> = emptyList(),
     val carregandoHistorico: Boolean = false,
     val erroHistorico: String? = null,

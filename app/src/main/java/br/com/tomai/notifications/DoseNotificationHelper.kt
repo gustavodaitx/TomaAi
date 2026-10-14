@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import br.com.tomai.MainActivity
@@ -35,6 +36,10 @@ object DoseNotificationHelper {
         mensagem: String
     ) {
         garantirCanal(context)
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            Log.w("TOMAI_NOTIFICACOES", "Notificação não exibida: permissão ou notificações desativadas.")
+            return
+        }
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -54,6 +59,7 @@ object DoseNotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.from(context).notify(notificationId, notification)
+        runCatching { NotificationManagerCompat.from(context).notify(notificationId, notification) }
+            .onFailure { Log.e("TOMAI_NOTIFICACOES", "Falha ao publicar lembrete local.", it) }
     }
 }

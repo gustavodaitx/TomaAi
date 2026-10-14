@@ -10,10 +10,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ca9146bd-de5e-4db9-aa4f-6c8e74d5dc49" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gradle/8.7/executionHistory/executionHistory.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/executionHistory/executionHistory.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/buildOutputCleanup/buildOutputCleanup.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.lock" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/8.7/fileHashes/fileHashes.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/DoseRepositoryImpl.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/data/repository/DoseRepositoryImpl.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/notifications/DoseNotificationHelper.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/notifications/DoseNotificationHelper.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/notifications/DoseReminderReceiver.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/notifications/DoseReminderReceiver.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/notifications/DoseReminderScheduler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/notifications/DoseReminderScheduler.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/doses/DosesDiaScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/doses/DosesDiaScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/home/HomeScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/ui/home/HomeScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/DoseUiState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/DoseUiState.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/DoseViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/br/com/tomai/viewmodel/DoseViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firestore.rules" beforeDir="false" afterPath="$PROJECT_DIR$/firestore.rules" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -82,7 +90,7 @@
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "salvardosesdia",
+    "git-widget-placeholder": "feature/push-notifications",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/Gustavo Daitx/Desktop/GitHub/Projeto-de-Desenvolvimento-de-Negocios/TomaAi",
     "run.code.analysis.last.selected.profile": "pProject Default",

@@ -54,6 +54,8 @@ class DoseViewModel(
             it.copy(
                 usuarioId = usuarioId,
                 dataAgenda = dataHoje,
+                medicamentosSincronizados = emptyList(),
+                medicamentoIdsValidosHoje = emptySet(),
                 isLoading = true,
                 erro = null
             )
@@ -62,6 +64,16 @@ class DoseViewModel(
         medicamentosJob = viewModelScope.launch {
             try {
                 medicamentoRepository.observarMedicamentos(usuarioId).collect { medicamentos ->
+                _uiState.update { it.copy(medicamentosSincronizados = medicamentos) }
+                val dataHojeLocal = runCatching { java.time.LocalDate.parse(dataHoje) }.getOrNull()
+                val idsValidosHoje = medicamentos.filter { medicamento ->
+                    val dataInicioOk = medicamento.dataInicio.isBlank() || dataHoje >= medicamento.dataInicio
+                    val dataFimOk = medicamento.dataFim.isBlank() || dataHoje <= medicamento.dataFim
+                    val frequenciaOk = medicamento.frequencia != br.com.tomai.model.Medicamento.FREQUENCIA_PERSONALIZADA ||
+                        (dataHojeLocal != null && dataHojeLocal.dayOfWeek.value in medicamento.diasSemana)
+                    medicamento.ativo && dataInicioOk && dataFimOk && frequenciaOk
+                }.mapTo(mutableSetOf()) { it.id }
+                _uiState.update { it.copy(medicamentoIdsValidosHoje = idsValidosHoje) }
                 _uiState.update { it.copy(isSincronizandoAgenda = true) }
                 try {
                     doseRepository.garantirAgendaDiaria(

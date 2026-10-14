@@ -118,6 +118,17 @@ class DoseRepositoryImpl(
 
             var batch = firestore.batch()
             var operacoes = 0
+            val medicamentosValidosNoDia = medicamentos.asSequence()
+                .filter { medicamento ->
+                    val data = runCatching { java.time.LocalDate.parse(dataAgenda) }.getOrNull()
+                        ?: return@filter false
+                    medicamento.ativo &&
+                        (medicamento.dataInicio.isBlank() || dataAgenda >= medicamento.dataInicio) &&
+                        (medicamento.dataFim.isBlank() || dataAgenda <= medicamento.dataFim) &&
+                        (medicamento.frequencia != Medicamento.FREQUENCIA_PERSONALIZADA ||
+                            data.dayOfWeek.value in medicamento.diasSemana)
+                }
+                .associateBy { it.id }
 
             medicamentos.filter { it.ativo }.forEach medicamentoLoop@ { medicamento ->
                 val data = runCatching { java.time.LocalDate.parse(dataAgenda) }.getOrNull()
@@ -171,6 +182,33 @@ class DoseRepositoryImpl(
                         batch.commit().await()
                         batch = firestore.batch()
                         operacoes = 0
+                    }
+                }
+            }
+
+            // Uma edição/inativação não deve deixar lembretes futuros para horários removidos.
+            val zonaAtual = java.time.ZoneId.systemDefault()
+            dosesExistentes.values.forEach { doseDocument ->
+                val dose = runCatching {
+                    Dose.fromFirestoreMap(doseDocument.id, doseDocument.data ?: emptyMap())
+                }.getOrNull() ?: return@forEach
+                if (dose.status != Dose.STATUS_PENDENTE || dose.usuarioId != authenticatedUid) return@forEach
+                val dataDose = runCatching { java.time.LocalDate.parse(dose.dataAgenda) }.getOrNull()
+                    ?: return@forEach
+                val horaDose = runCatching { java.time.LocalTime.parse(dose.horarioProgramado) }.getOrNull()
+                    ?: return@forEach
+                val instante = java.time.LocalDateTime.of(dataDose, horaDose).atZone(zonaAtual).toInstant()
+                if (instante.isAfter(java.time.Instant.now())) {
+                    val medicamento = medicamentosValidosNoDia[dose.medicamentoId]
+                    val horarioContinuaValido = medicamento?.horarios?.any { it.hora == dose.horarioProgramado } == true
+                    if (!horarioContinuaValido) {
+                        batch.delete(doseDocument.reference)
+                        operacoes++
+                        if (operacoes == 450) {
+                            batch.commit().await()
+                            batch = firestore.batch()
+                            operacoes = 0
+                        }
                     }
                 }
             }

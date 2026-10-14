@@ -118,6 +118,7 @@ service cloud.firestore {
 
       // Criar Doses (Geração diária/automática): Paciente logado
       allow create: if signedIn() 
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'PACIENTE'
         && request.resource.data.usuarioId == request.auth.uid;
 
       // Atualizar status da dose (ex: marcar como tomada): Paciente ou Pessoa de Confiança vinculada

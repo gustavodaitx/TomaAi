@@ -1,5 +1,12 @@
 package br.com.tomai.ui.home
 
+import android.Manifest
+import android.app.AlarmManager
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,8 +50,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.tooling.preview.Preview
 import br.com.tomai.ui.components.TomaAiLogo
 import br.com.tomai.ui.components.DoseCard
@@ -52,6 +66,7 @@ import br.com.tomai.model.Dose
 import br.com.tomai.viewmodel.AssinaturaViewModel
 import br.com.tomai.viewmodel.AuthViewModel
 import br.com.tomai.viewmodel.DoseViewModel
+import br.com.tomai.notifications.DoseReminderScheduler
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,11 +84,35 @@ fun HomeScreen(
     val auth by viewModel.uiState.collectAsState()
     val doses by doseViewModel.uiState.collectAsState()
     val assinatura by assinaturaViewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val clipboardManager = LocalClipboardManager.current
-    var codigoCopiado by remember { mutableStateOf(false) }
     val nome = auth.usuario?.nome?.substringBefore(' ')?.ifBlank { "Olá" } ?: "Olá"
     val uid = auth.firestoreUid ?: auth.usuario?.id?.takeIf(String::isNotBlank)
         ?: viewModel.obterUidAutenticado().orEmpty()
+    var codigoCopiado by remember { mutableStateOf(false) }
+    var notificacoesDesativadas by remember(uid) {
+        mutableStateOf(
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var alarmesExatosIndisponiveis by remember(uid) {
+        mutableStateOf(
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                !(context.getSystemService(android.content.Context.ALARM_SERVICE) as AlarmManager)
+                    .canScheduleExactAlarms()
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        notificacoesDesativadas = !granted
+        context.getSharedPreferences("permissoes_notificacao", android.content.Context.MODE_PRIVATE)
+            .edit().putBoolean("solicitada", true).apply()
+        if (!granted) android.util.Log.i("TOMAI_NOTIFICACOES", "Permissão de notificações recusada.")
+    }
 
     LaunchedEffect(Unit) {
         viewModel.obterUidAutenticado()?.takeIf(String::isNotBlank)?.let(viewModel::observarUsuarioFirestore)
@@ -82,7 +121,63 @@ fun HomeScreen(
         if (uid.isNotBlank()) {
             doseViewModel.iniciar(uid)
             assinaturaViewModel.carregar(uid)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                !context.getSharedPreferences("permissoes_notificacao", android.content.Context.MODE_PRIVATE)
+                    .getBoolean("solicitada", false)
+            ) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
+    }
+
+    LaunchedEffect(uid, doses.isLoading, doses.isSincronizandoAgenda, doses.erro, doses.doses,
+        doses.medicamentoIdsValidosHoje, doses.medicamentosSincronizados, auth.usuario?.perfil,
+        auth.usuario?.pacienteUid, auth.usuario?.aceitouReceberAvisos) {
+        if (uid.isBlank() || doses.isLoading || doses.isSincronizandoAgenda || doses.erro != null) return@LaunchedEffect
+        val perfil = auth.usuario?.perfil
+        if (perfil != br.com.tomai.model.Usuario.PERFIL_PACIENTE &&
+            perfil != br.com.tomai.model.Usuario.PERFIL_PESSOA_DE_CONFIANCA
+        ) return@LaunchedEffect
+        if (perfil == br.com.tomai.model.Usuario.PERFIL_PACIENTE &&
+            doses.medicamentosSincronizados.any { it.usuarioId != uid }
+        ) return@LaunchedEffect
+        val podeReceberLembretes = perfil == br.com.tomai.model.Usuario.PERFIL_PACIENTE ||
+            (perfil == br.com.tomai.model.Usuario.PERFIL_PESSOA_DE_CONFIANCA &&
+                !auth.usuario?.pacienteUid.isNullOrBlank() && auth.usuario?.aceitouReceberAvisos == true)
+        val pacienteUidAutorizado = if (perfil == br.com.tomai.model.Usuario.PERFIL_PACIENTE) {
+            uid
+        } else {
+            auth.usuario?.pacienteUid
+        }
+        val dosesAutorizadas = if (podeReceberLembretes) {
+            doses.doses.filter {
+                it.medicamentoId in doses.medicamentoIdsValidosHoje &&
+                    it.usuarioId == pacienteUidAutorizado
+            }
+        } else emptyList()
+        val medicamentosAutorizados = if (podeReceberLembretes) {
+            doses.medicamentosSincronizados.filter { it.usuarioId == pacienteUidAutorizado }
+        } else emptyList()
+        DoseReminderScheduler.sincronizar(context, uid, dosesAutorizadas, medicamentosAutorizados)
+    }
+
+    DisposableEffect(lifecycleOwner, uid) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                notificacoesDesativadas = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+            if (event == Lifecycle.Event.ON_RESUME && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                alarmesExatosIndisponiveis = !(context.getSystemService(android.content.Context.ALARM_SERVICE)
+                    as AlarmManager).canScheduleExactAlarms()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -95,7 +190,8 @@ fun HomeScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-            )
+    )
+
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { insets ->
@@ -108,11 +204,59 @@ fun HomeScreen(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Olá, $nome!", style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text("Acompanhe sua rotina e as confirmações de doses de hoje.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+
+            if (notificacoesDesativadas) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            "Ative as notificações para receber os lembretes de medicamentos neste aparelho.",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        TextButton(onClick = {
+                            val settingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            context.startActivity(settingsIntent)
+                        }) {
+                            Text("Abrir configurações de notificações")
+                        }
+                    }
+                }
+            }
+
+            if (alarmesExatosIndisponiveis) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            "Sem permissão para alarmes exatos, o Android pode atrasar os lembretes.",
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        TextButton(onClick = {
+                            val settingsIntent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                data = android.net.Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(settingsIntent)
+                        }) {
+                            Text("Permitir horários mais precisos")
+                        }
+                    }
                 }
             }
 

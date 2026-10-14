@@ -1,9 +1,5 @@
 package br.com.tomai.ui.doses
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,12 +41,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.com.tomai.model.Dose
-import br.com.tomai.notifications.DoseNotificationHelper
-import br.com.tomai.notifications.DoseReminderScheduler
 import br.com.tomai.viewmodel.DoseViewModel
 import br.com.tomai.ui.components.DoseCard
 
@@ -62,23 +55,10 @@ fun DosesDiaScreen(
     onVoltar: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { _ -> }
-
     LaunchedEffect(usuarioId) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        DoseNotificationHelper.garantirCanal(context)
         viewModel.iniciar(usuarioId)
-    }
-
-    LaunchedEffect(uiState.doses) {
-        DoseReminderScheduler.reagendarPendentes(context, uiState.doses)
     }
 
     LaunchedEffect(uiState.erro, uiState.sucessoMensagem) {
