@@ -46,15 +46,23 @@ service cloud.firestore {
 
     match /usuarios/{userId} {
 
-      allow read: if signedIn();
+      allow read: if owns(userId);
 
       // Permite a criação do próprio documento de usuário autenticado
       allow create: if owns(userId)
         && request.resource.data.id == userId
-        && request.resource.data.perfil in ['PACIENTE', 'PESSOA_DE_CONFIANCA', 'CUIDADOR'];
+        && request.resource.data.perfil in ['PACIENTE', 'PESSOA_DE_CONFIANCA', 'CUIDADOR']
+        && (!('planoAtual' in request.resource.data) || request.resource.data.planoAtual == 'FREE');
 
       // Permite atualização de campos (ex: codigoPaciente, telefone, responsavelPadraoId) pelo próprio dono
-      allow update: if owns(userId);
+      allow update: if owns(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "nome", "telefone", "email", "perfil", "ativo", "criadoEm",
+          "asaasCustomerId", "responsavelPadraoId", "codigoVinculo", "pacienteUid",
+          "codigoPaciente", "codigoPacienteDigitado", "aceitouReceberAvisos",
+          "planoAtual", "planoAtualizadoEm", "origemPlano", "statusSimulacao", "metodoSimulacao"
+        ])
+        && (!('planoAtual' in request.resource.data) || request.resource.data.planoAtual in ['FREE', 'QUINZENAL', 'MENSAL']);
 
       allow delete: if false;
     }

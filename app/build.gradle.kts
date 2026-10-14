@@ -98,4 +98,5 @@ dependencies {
     // Debugging UI
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    implementation("com.google.zxing:core:3.5.3")
 }

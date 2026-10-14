@@ -40,13 +40,17 @@ data class Usuario(
     val pacienteUid: String? = null,
     val codigoPaciente: String? = null,
     val codigoPacienteDigitado: String? = null,
-    val aceitouReceberAvisos: Boolean = true
+    val aceitouReceberAvisos: Boolean = true,
+    val planoAtual: String = PLANO_FREE,
+    val origemPlano: String = "SELECAO_GRATUITA",
+    val statusSimulacao: String? = null
 ) {
     companion object {
         const val PERFIL_PACIENTE = "PACIENTE"
         const val PERFIL_CUIDADOR = "CUIDADOR"
         const val PERFIL_PESSOA_DE_CONFIANCA = "PESSOA_DE_CONFIANCA"
         const val PERFIL_ADMIN = "ADMIN"
+        const val PLANO_FREE = "FREE"
 
         fun criarPadrao(
             uid: String,
@@ -90,7 +94,10 @@ data class Usuario(
                 pacienteUid = data["pacienteUid"] as? String,
                 codigoPaciente = data["codigoPaciente"] as? String ?: data["codigoVinculo"] as? String,
                 codigoPacienteDigitado = data["codigoPacienteDigitado"] as? String,
-                aceitouReceberAvisos = data["aceitouReceberAvisos"] as? Boolean ?: true
+                aceitouReceberAvisos = data["aceitouReceberAvisos"] as? Boolean ?: true,
+                planoAtual = data["planoAtual"] as? String ?: PLANO_FREE,
+                origemPlano = data["origemPlano"] as? String ?: "SELECAO_GRATUITA",
+                statusSimulacao = data["statusSimulacao"] as? String
             )
         }
     }
@@ -115,6 +122,9 @@ data class Usuario(
         if (pacienteUid != null) map["pacienteUid"] = pacienteUid
         if (codigoPacienteDigitado != null) map["codigoPacienteDigitado"] = codigoPacienteDigitado
         if (perfil == PERFIL_PESSOA_DE_CONFIANCA) map["aceitouReceberAvisos"] = aceitouReceberAvisos
+        map["planoAtual"] = planoAtual
+        map["origemPlano"] = origemPlano
+        if (statusSimulacao != null) map["statusSimulacao"] = statusSimulacao
         if (asaasCustomerId != null) {
             map["asaasCustomerId"] = asaasCustomerId
         }

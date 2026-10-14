@@ -80,11 +80,9 @@ fun AppNavGraph(
 
         composable(Screen.Home.rota) {
             val homeDoseViewModel: DoseViewModel = viewModel()
-            val homeAssinaturaViewModel: AssinaturaViewModel = viewModel()
             HomeScreen(
                 viewModel = viewModel,
                 doseViewModel = homeDoseViewModel,
-                assinaturaViewModel = homeAssinaturaViewModel,
                 onNavegarMedicamentos = {
                     navController.navigate(Screen.Medicamentos.rota)
                 },

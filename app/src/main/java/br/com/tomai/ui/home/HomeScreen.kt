@@ -63,7 +63,6 @@ import br.com.tomai.ui.components.TomaAiLogo
 import br.com.tomai.ui.components.DoseCard
 import br.com.tomai.ui.theme.TomaAiTheme
 import br.com.tomai.model.Dose
-import br.com.tomai.viewmodel.AssinaturaViewModel
 import br.com.tomai.viewmodel.AuthViewModel
 import br.com.tomai.viewmodel.DoseViewModel
 import br.com.tomai.notifications.DoseReminderScheduler
@@ -73,7 +72,6 @@ import br.com.tomai.notifications.DoseReminderScheduler
 fun HomeScreen(
     viewModel: AuthViewModel,
     doseViewModel: DoseViewModel,
-    assinaturaViewModel: AssinaturaViewModel,
     onNavegarMedicamentos: () -> Unit = {},
     onNavegarDosesDia: () -> Unit = {},
     onNavegarHistorico: () -> Unit = {},
@@ -83,7 +81,7 @@ fun HomeScreen(
 ) {
     val auth by viewModel.uiState.collectAsState()
     val doses by doseViewModel.uiState.collectAsState()
-    val assinatura by assinaturaViewModel.uiState.collectAsState()
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val clipboardManager = LocalClipboardManager.current
@@ -120,7 +118,6 @@ fun HomeScreen(
     LaunchedEffect(uid) {
         if (uid.isNotBlank()) {
             doseViewModel.iniciar(uid)
-            assinaturaViewModel.carregar(uid)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
                 android.content.pm.PackageManager.PERMISSION_GRANTED &&
@@ -319,10 +316,9 @@ fun HomeScreen(
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Plano de Assinatura", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        val atual = assinatura.assinaturas.firstOrNull { it["status"]?.toString()?.uppercase() in setOf("ATIVA", "ACTIVE") }
-                            ?: assinatura.assinaturas.firstOrNull()
-                        Text(atual?.get("planoId")?.toString()?.replace('_', ' ') ?: "Conheça os planos disponíveis",
-                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val planoAtual = auth.usuario?.planoAtual ?: "FREE"
+                        val nomePlano = when (planoAtual) { "QUINZENAL" -> "Quinzenal"; "MENSAL" -> "Mensal"; else -> "Free" }
+                        Text("Plano atual: $nomePlano", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text("›", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                 }

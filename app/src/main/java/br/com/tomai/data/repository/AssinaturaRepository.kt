@@ -1,63 +1,21 @@
 package br.com.tomai.data.repository
 
-import android.util.Log
-import br.com.tomai.model.Plano
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.functions.FirebaseFunctions
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
-class AssinaturaRepository(
-    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance(),
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
-) {
-    suspend fun listarPlanos(): List<Plano> {
-        val snapshot = firestore.collection("planos").get().await()
-        return snapshot.documents.mapNotNull { document ->
-            runCatching {
-                Plano.fromMap(document.id, document.data.orEmpty())
-            }.onFailure { erro ->
-                Log.w("AssinaturaRepository", "Plano ${document.id} ignorado: ${erro.localizedMessage}")
-            }.getOrNull()
-        }
-    }
-
-    suspend fun criarAssinatura(planoId: String, formaPagamento: String) = functions
-        .getHttpsCallable("criarAssinaturaAsaas")
-        .call(mapOf("planoId" to planoId, "formaPagamento" to formaPagamento)).await()
-
-    suspend fun consultarCobrancas(assinaturaId: String) = functions
-        .getHttpsCallable("consultarCobrancas")
-        .call(mapOf("assinaturaId" to assinaturaId)).await()
-
-    suspend fun cancelarAssinatura(assinaturaId: String) = functions
-        .getHttpsCallable("cancelarAssinaturaAsaas")
-        .call(mapOf("assinaturaId" to assinaturaId)).await()
-
-    suspend fun obterPix(cobrancaId: String): String {
-        val result = functions.getHttpsCallable("obterPixCobranca")
-            .call(mapOf("cobrancaId" to cobrancaId)).await()
-        return (result.getData() as? Map<*, *>)?.get("payload") as? String
-            ?: throw IllegalStateException("Código Pix não disponível para esta cobrança.")
-    }
-
-    fun observarAssinaturas(usuarioId: String): Flow<List<Map<String, Any?>>> = callbackFlow {
-        val listener = firestore.collection("assinaturas").whereEqualTo("usuarioId", usuarioId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) { close(error); return@addSnapshotListener }
-                trySend(snapshot?.documents?.map { it.data.orEmpty() + ("documentId" to it.id) }.orEmpty())
-            }
-        awaitClose { listener.remove() }
-    }
-
-    fun observarCobrancas(usuarioId: String): Flow<List<Map<String, Any?>>> = callbackFlow {
-        val listener = firestore.collection("cobrancas").whereEqualTo("usuarioId", usuarioId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) { close(error); return@addSnapshotListener }
-                trySend(snapshot?.documents?.map { it.data.orEmpty() + ("documentId" to it.id) }.orEmpty())
-            }
-        awaitClose { listener.remove() }
+/** Persiste somente metadados não sensíveis no perfil do usuário autenticado. */
+class AssinaturaRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+    suspend fun atualizarPlanoUsuario(usuarioId: String, planoId: String, metodo: String?) {
+        require(usuarioId.isNotBlank())
+        require(planoId in setOf("FREE", "QUINZENAL", "MENSAL"))
+        val dados = mutableMapOf<String, Any?>(
+            "planoAtual" to planoId,
+            "planoAtualizadoEm" to FieldValue.serverTimestamp(),
+            "origemPlano" to if (planoId == "FREE") "SELECAO_GRATUITA" else "SIMULACAO_PAGAMENTO",
+            "statusSimulacao" to if (planoId == "FREE") null else "APROVADO_SIMULADO"
+        )
+        dados["metodoSimulacao"] = metodo
+        firestore.collection("usuarios").document(usuarioId).update(dados).await()
     }
 }
