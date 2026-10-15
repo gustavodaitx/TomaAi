@@ -9,6 +9,7 @@ import { verificarDosesNaoConfirmadas } from "./alerts/verificarDosesNaoConfirma
 import { obterPlanosPadrao } from "./asaas/planos";
 import { gerarCobrancasQuinzenais } from "./asaas/gerarCobrancasQuinzenais";
 import { criarPerfilPessoaDeConfianca as criarPerfilPessoaDeConfiancaNoFirestore, ErroCadastroPessoaDeConfianca } from "./usuarios/cadastroPessoaDeConfianca";
+import { limparDadosMedicacao as limparDadosMedicacaoNoFirestore } from "./usuarios/limparDadosMedicacao";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -53,6 +54,40 @@ export const criarPerfilPessoaDeConfianca = functions.https.onCall(async (data, 
     console.error("Falha inesperada ao criar perfil de pessoa de confiança.", error);
     throw new functions.https.HttpsError("internal", "Não foi possível concluir o cadastro. Tente novamente.");
   }
+});
+
+export const limparDadosMedicacao = functions.https.onCall(async (_data, context) => {
+  const uid = exigirLogin(context);
+  try {
+    const perfil = (await db.collection("usuarios").doc(uid).get()).get("perfil");
+    if (perfil !== "PACIENTE") {
+      throw new functions.https.HttpsError("permission-denied", "Somente o paciente pode limpar os próprios dados de medicação.");
+    }
+    return { removidosPorColecao: await limparDadosMedicacaoNoFirestore(uid, db) };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    console.error("Falha ao limpar dados de medicação do usuário autenticado.", error);
+    throw new functions.https.HttpsError("internal", "A limpeza não foi concluída integralmente. Tente novamente.");
+  }
+});
+
+export const obterNomePacienteVinculado = functions.https.onCall(async (_data, context) => {
+  const uid = exigirLogin(context);
+  const pessoa = (await db.collection("usuarios").doc(uid).get()).data();
+  if (pessoa?.perfil !== "PESSOA_DE_CONFIANCA" ||
+      typeof pessoa.pacienteUid !== "string" || !pessoa.pacienteUid) {
+    throw new functions.https.HttpsError("permission-denied", "Não há um vínculo autorizado com paciente.");
+  }
+  const vinculo = await db.collection("vinculos").doc(`${pessoa.pacienteUid}_${uid}`).get();
+  if (!vinculo.exists || vinculo.get("ativo") !== true || vinculo.get("pacienteUid") !== pessoa.pacienteUid ||
+      vinculo.get("cuidadorUid") !== uid) {
+    throw new functions.https.HttpsError("permission-denied", "O vínculo com o paciente não está ativo.");
+  }
+  const paciente = (await db.collection("usuarios").doc(pessoa.pacienteUid).get()).data();
+  if (paciente?.perfil !== "PACIENTE") {
+    throw new functions.https.HttpsError("not-found", "Perfil do paciente não encontrado.");
+  }
+  return { nome: typeof paciente.nome === "string" ? paciente.nome.trim() : "" };
 });
 
 export const listarPlanos = functions.https.onCall(async (_data, context) => {

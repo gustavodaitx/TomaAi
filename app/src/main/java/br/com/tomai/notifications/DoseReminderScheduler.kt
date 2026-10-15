@@ -168,6 +168,24 @@ object DoseReminderScheduler {
         prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
     }
 
+    fun limparAgendamentos(context: Context, deviceUid: String) {
+        if (deviceUid.isBlank()) return
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val all = readAll(prefs)
+        val schedules = all.optJSONArray(deviceUid) ?: JSONArray()
+        for (index in 0 until schedules.length()) {
+            val schedule = schedules.optJSONObject(index) ?: continue
+            val doseId = schedule.optString("doseId")
+            cancelar(appContext, deviceUid, doseId)
+            cancelarAgendamentoLegado(appContext, doseId)
+            DoseNotificationHelper.cancelarLembrete(appContext, notificationId(deviceUid, doseId))
+            DoseNotificationHelper.cancelarLembrete(appContext, doseId.hashCode())
+        }
+        all.put(deviceUid, JSONArray())
+        prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
+    }
+
     private fun cancelar(context: Context, deviceUid: String, doseId: String) {
         if (doseId.isBlank()) return
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager

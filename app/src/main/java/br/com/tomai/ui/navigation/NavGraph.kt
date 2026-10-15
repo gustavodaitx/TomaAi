@@ -9,6 +9,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import br.com.tomai.BuildConfig
 import br.com.tomai.ui.cadastro.CadastroScreen
 import br.com.tomai.ui.home.HomeScreen
 import br.com.tomai.ui.login.LoginScreen
@@ -25,6 +26,8 @@ import br.com.tomai.viewmodel.MedicamentoViewModel
 import br.com.tomai.viewmodel.PessoaConfiancaViewModel
 import br.com.tomai.viewmodel.AssinaturaViewModel
 import br.com.tomai.viewmodel.ScreenMedicamentoId
+import br.com.tomai.ui.settings.DevelopmentToolsScreen
+import br.com.tomai.ui.settings.SettingsScreen
 
 @Composable
 fun AppNavGraph(
@@ -94,6 +97,7 @@ fun AppNavGraph(
                     navController.navigate(Screen.PessoasConfianca.rota)
                 },
                 onNavegarAssinaturas = { navController.navigate(Screen.Assinaturas.rota) },
+                onNavegarConfiguracoes = { navController.navigate(Screen.Configuracoes.rota) },
                 onLogoutConcluido = {
                     navController.navigate(Screen.Login.rota) {
                         popUpTo(Screen.Home.rota) { inclusive = true }
@@ -139,6 +143,20 @@ fun AppNavGraph(
                 viewModel = assinaturaViewModel,
                 onVoltar = { navController.popBackStack() }
             )
+        }
+
+        composable(Screen.Configuracoes.rota) {
+            SettingsScreen(
+                usuario = uiState.usuario,
+                onVoltar = { navController.popBackStack() },
+                onAbrirAreaDesenvolvimento = { navController.navigate(Screen.FerramentasDesenvolvimento.rota) }
+            )
+        }
+
+        if (BuildConfig.DEBUG) {
+            composable(Screen.FerramentasDesenvolvimento.rota) {
+                DevelopmentToolsScreen(onVoltar = { navController.popBackStack() })
+            }
         }
 
         composable(Screen.Medicamentos.rota) {

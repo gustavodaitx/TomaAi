@@ -13,6 +13,8 @@ sealed class Screen(val rota: String) {
     data object Medicamentos : Screen("medicamentos")
     data object PessoasConfianca : Screen("pessoas_confianca")
     data object Assinaturas : Screen("assinaturas")
+    data object Configuracoes : Screen("configuracoes")
+    data object FerramentasDesenvolvimento : Screen("ferramentas_desenvolvimento")
     data object MedicamentoForm : Screen("medicamento_form/{medicamentoId}") {
         fun criarRota(medicamentoId: String) = "medicamento_form/$medicamentoId"
     }

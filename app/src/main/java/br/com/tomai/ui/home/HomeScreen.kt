@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
@@ -66,6 +67,8 @@ import br.com.tomai.model.Dose
 import br.com.tomai.viewmodel.AuthViewModel
 import br.com.tomai.viewmodel.DoseViewModel
 import br.com.tomai.notifications.DoseReminderScheduler
+import com.google.firebase.functions.FirebaseFunctions
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +80,7 @@ fun HomeScreen(
     onNavegarHistorico: () -> Unit = {},
     onNavegarPessoasConfianca: () -> Unit = {},
     onNavegarAssinaturas: () -> Unit = {},
+    onNavegarConfiguracoes: () -> Unit = {},
     onLogoutConcluido: () -> Unit
 ) {
     val auth by viewModel.uiState.collectAsState()
@@ -85,7 +89,9 @@ fun HomeScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val clipboardManager = LocalClipboardManager.current
-    val nome = auth.usuario?.nome?.substringBefore(' ')?.ifBlank { "Olá" } ?: "Olá"
+    val nomeCompleto = auth.usuario?.nome?.trim().orEmpty()
+    val nome = nomeCompleto.substringBefore(' ').ifBlank { "paciente" }
+    var nomePacienteVinculado by remember(auth.usuario?.pacienteUid) { mutableStateOf<String?>(null) }
     val uid = auth.firestoreUid ?: auth.usuario?.id?.takeIf(String::isNotBlank)
         ?: viewModel.obterUidAutenticado().orEmpty()
     var codigoCopiado by remember { mutableStateOf(false) }
@@ -114,6 +120,17 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.obterUidAutenticado()?.takeIf(String::isNotBlank)?.let(viewModel::observarUsuarioFirestore)
+    }
+    LaunchedEffect(auth.usuario?.perfil, auth.usuario?.pacienteUid, auth.usuario?.aceitouReceberAvisos) {
+        nomePacienteVinculado = null
+        if (auth.usuario?.perfil == br.com.tomai.model.Usuario.PERFIL_PESSOA_DE_CONFIANCA &&
+            !auth.usuario?.pacienteUid.isNullOrBlank()) {
+            nomePacienteVinculado = runCatching {
+                val resposta = FirebaseFunctions.getInstance()
+                    .getHttpsCallable("obterNomePacienteVinculado").call().await().data as? Map<*, *>
+                (resposta?.get("nome") as? String)?.trim()?.takeIf(String::isNotBlank)
+            }.getOrNull()
+        }
     }
     LaunchedEffect(uid) {
         if (uid.isNotBlank()) {
@@ -182,6 +199,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { TomaAiLogo(size = 48.dp) },
                 actions = {
+                    IconButton(onClick = onNavegarConfiguracoes) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Configurações")
+                    }
                     IconButton(onClick = { viewModel.logout(onConcluido = onLogoutConcluido) }) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Sair")
                     }
@@ -202,9 +222,16 @@ fun HomeScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Olá, $nome!", style = MaterialTheme.typography.headlineSmall,
+                    Text(if (nomeCompleto.isBlank()) "Olá!" else "Olá, $nome!", style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("Acompanhe sua rotina e as confirmações de doses de hoje.",
+                    val identificacaoPaciente = when (auth.usuario?.perfil) {
+                        br.com.tomai.model.Usuario.PERFIL_PACIENTE -> nomeCompleto.takeIf(String::isNotBlank)
+                            ?.let { "Paciente: $it" } ?: "Perfil do paciente"
+                        br.com.tomai.model.Usuario.PERFIL_PESSOA_DE_CONFIANCA -> nomePacienteVinculado?.let { "Paciente: $it" }
+                            ?: "Paciente vinculado"
+                        else -> "Acompanhe sua rotina e as confirmações de doses de hoje."
+                    }
+                    Text(identificacaoPaciente,
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
