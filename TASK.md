@@ -57,11 +57,12 @@
 
 - [x] **T4.1 — Cadastro de Pessoa de Confiança (`PessoaConfianca`)**
   - *Aceite:* Tela de cadastro/listagem com flag `aceitouReceberAvisos` e atribuição de `responsavelPadraoId` no perfil do usuário (`/usuarios/{uid}`).
-- [x] **T4.2 — Lógica de Disparo de Alertas por Dose Não Confirmada**
+- [ ] **T4.2 — Lógica de Disparo de Alertas por Dose Não Confirmada**
   - *Aceite:* Verificação de estouro de tempo limite após horário programado sem confirmação da dose e gravação do registro na coleção `/alertas`.
-- [x] **T4.3 — Camada Abstrata para Envio de Notificações (SMS / E-mail / Push)**
+  - *Status:* **Parcial / pendente de validação** — O app agenda repetição local da mesma dose a cada 2 minutos nos aparelhos paciente e pessoa de confiança, com consulta ao status e à autorização antes de repetir. A validação em execução, especialmente entre dois dispositivos, continua pendente.
+- [ ] **T4.3 — Camada Abstrata para Envio de Notificações (SMS / E-mail / Push)**
   - *Aceite:* Interface Service com implementação stub/mock e Cloud Functions + FCM preparada para notificações ao responsável sem dependência direta de provedores pagos em ambiente dev.
-  - *Status:* ✅ **Concluído** — Alertas usam a interface `NotificationService`, com adaptador de log em desenvolvimento e adaptador FCM para tokens registrados na pessoa de confiança.
+  - *Status:* **Parcial / pendente de validação** — Existe um adaptador FCM no backend, mas não foi localizado no Android o registro e a atualização dos tokens. A repetição local em cada aparelho e a interrupção sincronizada ainda precisam ser validadas em dois dispositivos.
 
 ---
 

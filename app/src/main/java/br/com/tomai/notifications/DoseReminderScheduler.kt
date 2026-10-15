@@ -21,6 +21,8 @@ object DoseReminderScheduler {
     private const val TAG = "TOMAI_NOTIFICACOES"
     private const val PREFS = "lembretes_medicamentos"
     private const val KEY_SCHEDULES = "agendamentos"
+    private const val KEY_REPEAT_AT = "repetirEm"
+    private const val REPEAT_INTERVAL_MS = 2 * 60 * 1000L
 
     fun sincronizar(
         context: Context,
@@ -42,14 +44,19 @@ object DoseReminderScheduler {
             .filter { it.status == Dose.STATUS_PENDENTE && it.id.isNotBlank() }
             .forEach { dose ->
                 val trigger = triggerMillis(dose) ?: return@forEach
-                if (trigger <= now) return@forEach
-                desired[dose.id] = JSONObject()
+                val prior = (0 until previous.length()).mapNotNull(previous::optJSONObject)
+                    .firstOrNull { it.optString("doseId") == dose.id }
+                val repeating = prior != null && prior.optLong(KEY_REPEAT_AT, 0L) > 0L
+                if (trigger <= now && !repeating) return@forEach
+                val item = JSONObject()
                     .put("doseId", dose.id)
                     .put("usuarioId", dose.usuarioId)
                     .put("nome", dose.medicamentoNome)
                     .put("dosagem", dose.dosagem)
                     .put("horario", dose.horarioProgramado)
                     .put("data", dose.dataAgenda)
+                if (repeating) item.put(KEY_REPEAT_AT, prior!!.optLong(KEY_REPEAT_AT))
+                desired[dose.id] = item
             }
 
         for (index in 0 until previous.length()) {
@@ -58,6 +65,7 @@ object DoseReminderScheduler {
             val new = desired[id]
             if (new == null || !sameSchedule(old, new)) {
                 cancelar(appContext, uidDoDispositivo, id)
+                DoseNotificationHelper.cancelarLembrete(appContext, notificationId(uidDoDispositivo, id))
             }
         }
 
@@ -68,7 +76,9 @@ object DoseReminderScheduler {
                 .mapNotNull(previous::optJSONObject)
                 .firstOrNull { it.optString("doseId") == doseId && sameSchedule(it, schedule) }
             val toSchedule = existing ?: schedule
-            agendar(appContext, uidDoDispositivo, toSchedule)
+            val repetirEm = toSchedule.optLong(KEY_REPEAT_AT, 0L)
+            if (repetirEm > 0L) agendar(appContext, uidDoDispositivo, toSchedule, repetirEm)
+            else agendar(appContext, uidDoDispositivo, toSchedule)
             next.put(toSchedule)
         }
         all.put(uidDoDispositivo, next)
@@ -89,9 +99,11 @@ object DoseReminderScheduler {
             val valid = JSONArray()
             for (index in 0 until old.length()) {
                 val schedule = old.optJSONObject(index) ?: continue
-                val trigger = triggerMillis(schedule) ?: continue
-                if (trigger <= now) continue
-                agendar(appContext, uid, schedule)
+                val repeatAt = schedule.optLong(KEY_REPEAT_AT, 0L)
+                val trigger = if (repeatAt > 0L) maxOf(repeatAt, now + REPEAT_INTERVAL_MS) else triggerMillis(schedule) ?: continue
+                if (repeatAt == 0L && trigger <= now) continue
+                if (repeatAt > 0L) schedule.put(KEY_REPEAT_AT, trigger)
+                agendar(appContext, uid, schedule, trigger)
                 valid.put(schedule)
             }
             all.put(uid, valid)
@@ -100,8 +112,8 @@ object DoseReminderScheduler {
         Log.d(TAG, "Alarmes locais futuros restaurados após evento do sistema.")
     }
 
-    private fun agendar(context: Context, deviceUid: String, data: JSONObject) {
-        val trigger = triggerMillis(data) ?: return
+    private fun agendar(context: Context, deviceUid: String, data: JSONObject, atMillis: Long? = null) {
+        val trigger = atMillis ?: triggerMillis(data) ?: return
         if (trigger <= System.currentTimeMillis()) return
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pendingIntent = pendingIntent(context, deviceUid, data, PendingIntent.FLAG_UPDATE_CURRENT)
@@ -116,6 +128,44 @@ object DoseReminderScheduler {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pendingIntent)
             Log.w(TAG, "Sem autorização para alarme exato; usado agendamento aproximado.", error)
         }
+    }
+
+    fun agendarRepeticao(
+        context: Context,
+        deviceUid: String,
+        doseId: String,
+        nome: String,
+        dosagem: String,
+        horario: String
+    ) {
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val all = readAll(prefs)
+        val schedules = all.optJSONArray(deviceUid) ?: return
+        val schedule = (0 until schedules.length()).mapNotNull(schedules::optJSONObject)
+            .firstOrNull { it.optString("doseId") == doseId } ?: return
+        val next = System.currentTimeMillis() + REPEAT_INTERVAL_MS
+        schedule.put(KEY_REPEAT_AT, next)
+        schedule.put("nome", nome)
+        schedule.put("dosagem", dosagem)
+        schedule.put("horario", horario)
+        prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
+        agendar(appContext, deviceUid, schedule, next)
+    }
+
+    fun cancelarRepeticao(context: Context, deviceUid: String, doseId: String) {
+        val appContext = context.applicationContext
+        cancelar(appContext, deviceUid, doseId)
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val all = readAll(prefs)
+        val schedules = all.optJSONArray(deviceUid) ?: return
+        val remaining = JSONArray()
+        for (index in 0 until schedules.length()) {
+            val schedule = schedules.optJSONObject(index) ?: continue
+            if (schedule.optString("doseId") != doseId) remaining.put(schedule)
+        }
+        all.put(deviceUid, remaining)
+        prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
     }
 
     private fun cancelar(context: Context, deviceUid: String, doseId: String) {
@@ -177,6 +227,8 @@ object DoseReminderScheduler {
 
     private fun uri(deviceUid: String, doseId: String): Uri =
         Uri.parse("tomai://lembrete/${Uri.encode(deviceUid)}/${Uri.encode(doseId)}")
+
+    private fun notificationId(deviceUid: String, doseId: String): Int = "$deviceUid|$doseId".hashCode()
 
     private fun triggerMillis(data: JSONObject): Long? {
         val date = runCatching { LocalDate.parse(data.optString("data")) }.getOrNull() ?: return null

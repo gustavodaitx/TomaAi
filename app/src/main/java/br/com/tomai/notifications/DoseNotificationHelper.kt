@@ -62,4 +62,8 @@ object DoseNotificationHelper {
         runCatching { NotificationManagerCompat.from(context).notify(notificationId, notification) }
             .onFailure { Log.e("TOMAI_NOTIFICACOES", "Falha ao publicar lembrete local.", it) }
     }
+
+    fun cancelarLembrete(context: Context, notificationId: Int) {
+        NotificationManagerCompat.from(context).cancel(notificationId)
+    }
 }
