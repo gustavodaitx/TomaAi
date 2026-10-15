@@ -19,3 +19,9 @@ node_modules/
 /functions/.env.*
 !/functions/.env.example
 npm-debug.log
+# Gradle e IDE (Android Studio / VS Code)
+.gradle/
+.idea/
+*.iml
+build/
+.vscode/
