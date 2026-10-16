@@ -243,7 +243,7 @@ class MedicamentoViewModel(
                             _uiState.update {
                                 it.copy(
                                     isLoadingLista = false,
-                                    sucessoMensagem = "Medicamento excluído. ${resultado.doseIdsRemovidas.size} dose(s) futura(s) removida(s); histórico preservado."
+                                    sucessoMensagem = "Exclusão concluída com sucesso. ${resultado.doseIdsRemovidas.size} dose(s) futura(s) removida(s); histórico preservado."
                                 )
                             }
                         },

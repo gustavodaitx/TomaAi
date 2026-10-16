@@ -322,14 +322,6 @@ class MedicamentoRepositoryImpl(
             etapa = "excluir o medicamento"
             colecaoAtual = COLECAO_MEDICAMENTOS
             if (!medicamentoSnapshot.isEmpty) medicamentoRef.delete().await()
-            etapa = "confirmar a exclusão do medicamento"
-            documentoAtual = medicamentoId
-            val medicamentoRestante = medicamentosRef
-                .whereEqualTo("usuarioId", uid)
-                .whereEqualTo(FieldPath.documentId(), medicamentoId)
-                .get(Source.SERVER)
-                .await()
-            check(medicamentoRestante.isEmpty) { "O medicamento permaneceu no servidor." }
             Log.i(TAG, "exclusao_etapa_sucesso colecao=$COLECAO_MEDICAMENTOS documento=$medicamentoId")
 
             Result.success(
