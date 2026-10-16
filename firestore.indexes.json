@@ -17,6 +17,30 @@
       ]
     },
     {
+      "collectionGroup": "doses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioId", "order": "ASCENDING" },
+        { "fieldPath": "medicamentoId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "horarios_medicamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioId", "order": "ASCENDING" },
+        { "fieldPath": "medicamentoId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "medicamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioId", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "assinaturas",
       "queryScope": "COLLECTION",
       "fields": [

@@ -80,9 +80,12 @@ class DoseViewModel(
                         usuarioId = usuarioId,
                         medicamentos = medicamentos,
                         dataAgenda = dataHoje
-                    ).onFailure { falha ->
-                        _uiState.update { it.copy(erro = falha.message) }
-                    }
+                    ).fold(
+                        onSuccess = { idsValidosServidor ->
+                            _uiState.update { it.copy(medicamentoIdsValidosHoje = idsValidosServidor) }
+                        },
+                        onFailure = { falha -> _uiState.update { it.copy(erro = falha.message) } }
+                    )
                 } catch (cancelamento: CancellationException) {
                     throw cancelamento
                 } catch (falha: Exception) {

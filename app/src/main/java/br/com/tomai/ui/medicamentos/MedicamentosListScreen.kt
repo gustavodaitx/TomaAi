@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.com.tomai.model.Medicamento
+import br.com.tomai.notifications.DoseReminderScheduler
 import br.com.tomai.viewmodel.MedicamentoViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +62,7 @@ fun MedicamentosListScreen(
     onEditar: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var medicamentoParaRemover by remember { mutableStateOf<Medicamento?>(null) }
     var busca by remember { mutableStateOf("") }
@@ -80,22 +84,41 @@ fun MedicamentosListScreen(
 
     medicamentoParaRemover?.let { med ->
         AlertDialog(
-            onDismissRequest = { medicamentoParaRemover = null },
-            title = { Text("Remover medicamento") },
-            text = { Text("Deseja remover \"${med.nome}\" da sua lista?") },
+            onDismissRequest = {
+                if (!uiState.isLoadingLista) medicamentoParaRemover = null
+            },
+            title = { Text("Excluir medicamento") },
+            text = {
+                Text("Excluir \"${med.nome}\", seus horários e doses pendentes futuras? Doses confirmadas e anteriores serão preservadas como histórico.")
+            },
             confirmButton = {
                 TextButton(
+                    enabled = !uiState.isLoadingLista,
                     onClick = {
-                        viewModel.desativar(med.id) {
+                        viewModel.excluir(med.id) { resultado ->
+                            val cancelamento = DoseReminderScheduler.cancelarDoses(
+                                context = context,
+                                deviceUid = resultado.usuarioId,
+                                doseIds = resultado.doseIdsRemovidas
+                            )
                             medicamentoParaRemover = null
+                            cancelamento
                         }
                     }
                 ) {
-                    Text("Remover", color = MaterialTheme.colorScheme.error)
+                    if (uiState.isLoadingLista) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("Excluindo…", modifier = Modifier.padding(start = 8.dp))
+                    } else {
+                        Text("Excluir", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { medicamentoParaRemover = null }) {
+                TextButton(
+                    enabled = !uiState.isLoadingLista,
+                    onClick = { medicamentoParaRemover = null }
+                ) {
                     Text("Cancelar")
                 }
             }

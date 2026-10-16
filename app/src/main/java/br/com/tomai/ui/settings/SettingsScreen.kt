@@ -45,6 +45,7 @@ fun SettingsScreen(usuario: Usuario?, onVoltar: () -> Unit, onAbrirAreaDesenvolv
     var confirmacaoDigitada by remember { mutableStateOf("") }
     var carregando by remember { mutableStateOf(false) }
     var resultado by remember { mutableStateOf<String?>(null) }
+    var resultadoFalhou by remember { mutableStateOf(false) }
     val uid = usuario?.id.orEmpty()
     val podeLimpar = usuario?.perfil == Usuario.PERFIL_PACIENTE
     val nome = usuario?.nome?.trim().orEmpty()
@@ -82,7 +83,9 @@ fun SettingsScreen(usuario: Usuario?, onVoltar: () -> Unit, onAbrirAreaDesenvolv
                 }
             }
 
-            resultado?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            resultado?.let {
+                Text(it, color = if (resultadoFalhou) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            }
             if (carregando) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 CircularProgressIndicator()
                 Text("Limpando dados de medicação…")
@@ -125,13 +128,18 @@ fun SettingsScreen(usuario: Usuario?, onVoltar: () -> Unit, onAbrirAreaDesenvolv
                         mostrarConfirmacao = false
                         carregando = true
                         resultado = null
+                          resultadoFalhou = false
                         scope.launch {
                             LimpezaDadosRepository().limparDadosMedicacao().fold(
                                 onSuccess = { resposta ->
                                     DoseReminderScheduler.limparAgendamentos(context, uid)
                                     resultado = "Limpeza concluída. ${resposta.totalRemovido} registro(s) removido(s) nas coleções de medicação e alertas."
+                                    resultadoFalhou = false
                                 },
-                                onFailure = { erro -> resultado = erro.localizedMessage ?: "A limpeza não foi concluída integralmente. Tente novamente." }
+                                onFailure = { erro ->
+                                    resultado = erro.localizedMessage ?: "A limpeza não foi concluída integralmente. Tente novamente."
+                                    resultadoFalhou = true
+                                }
                             )
                             carregando = false
                         }

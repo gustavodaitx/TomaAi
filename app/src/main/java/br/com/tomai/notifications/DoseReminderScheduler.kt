@@ -168,6 +168,38 @@ object DoseReminderScheduler {
         prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
     }
 
+    /** Cancela alarmes locais e notificações das doses removidas no servidor. */
+    fun cancelarDoses(context: Context, deviceUid: String, doseIds: List<String>): Result<Unit> {
+        if (deviceUid.isBlank() || doseIds.isEmpty()) return Result.success(Unit)
+        return try {
+            val appContext = context.applicationContext
+            val ids = doseIds.toSet()
+            val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val all = readAll(prefs)
+            val schedules = all.optJSONArray(deviceUid) ?: JSONArray()
+            val remaining = JSONArray()
+            ids.forEach { doseId ->
+                cancelar(appContext, deviceUid, doseId)
+                cancelarAgendamentoLegado(appContext, doseId)
+                DoseNotificationHelper.cancelarLembrete(appContext, notificationId(deviceUid, doseId))
+                DoseNotificationHelper.cancelarLembrete(appContext, doseId.hashCode())
+            }
+            for (index in 0 until schedules.length()) {
+                val schedule = schedules.optJSONObject(index) ?: continue
+                if (schedule.optString("doseId") !in ids) remaining.put(schedule)
+            }
+            all.put(deviceUid, remaining)
+            check(prefs.edit().putString(KEY_SCHEDULES, all.toString()).commit()) {
+                "Não foi possível salvar a agenda local atualizada."
+            }
+            Log.i(TAG, "Lembretes locais cancelados para ${ids.size} dose(s) removida(s).")
+            Result.success(Unit)
+        } catch (error: Exception) {
+            Log.e(TAG, "Falha ao cancelar lembretes locais das doses removidas.", error)
+            Result.failure(error)
+        }
+    }
+
     fun limparAgendamentos(context: Context, deviceUid: String) {
         if (deviceUid.isBlank()) return
         val appContext = context.applicationContext

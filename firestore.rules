@@ -39,6 +39,16 @@ service cloud.firestore {
         && get(vinculoPath).data.ativo == true;
     }
 
+    function medicamentoPermiteDose(medicamentoId) {
+      let medicamentoPath = /databases/$(database)/documents/medicamentos/$(medicamentoId);
+      return signedIn()
+        && exists(medicamentoPath)
+        && get(medicamentoPath).data.usuarioId == request.auth.uid
+        && (get(medicamentoPath).data.get('ativo', true) == true
+          || get(medicamentoPath).data.get('ativo', true) == 1)
+        && get(medicamentoPath).data.get('exclusaoEmAndamento', false) != true;
+    }
+
 
     // ============================================================
     // USUÁRIOS
@@ -82,9 +92,14 @@ service cloud.firestore {
 
       // Escrita (Criar/Editar/Excluir): Apenas o Paciente dono do registro
       allow create: if signedIn() 
-        && request.resource.data.usuarioId == request.auth.uid;
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.get('exclusaoEmAndamento', false) != true;
 
-      allow update, delete: if ownsExisting();
+      allow update: if ownsExisting()
+        && (!resource.data.get('exclusaoEmAndamento', false) ||
+          (request.resource.data.get('exclusaoEmAndamento', false) == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['exclusaoEmAndamento'])));
+      allow delete: if ownsExisting();
     }
 
 
@@ -104,8 +119,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.usuarioId == request.auth.uid
         && request.resource.data.medicamentoId is string
-        && exists(/databases/$(database)/documents/medicamentos/$(request.resource.data.medicamentoId))
-        && get(/databases/$(database)/documents/medicamentos/$(request.resource.data.medicamentoId)).data.usuarioId == request.auth.uid;
+        && medicamentoPermiteDose(request.resource.data.medicamentoId);
 
       // Editar/Excluir: Apenas o Paciente dono
       allow update, delete: if ownsExisting();
@@ -127,7 +141,9 @@ service cloud.firestore {
       // Criar Doses (Geração diária/automática): Paciente logado
       allow create: if signedIn() 
         && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'PACIENTE'
-        && request.resource.data.usuarioId == request.auth.uid;
+        && request.resource.data.usuarioId == request.auth.uid
+        && request.resource.data.medicamentoId is string
+        && medicamentoPermiteDose(request.resource.data.medicamentoId);
 
       // Atualizar status da dose (ex: marcar como tomada): Paciente ou Pessoa de Confiança vinculada
       allow update: if signedIn() && (
@@ -136,7 +152,29 @@ service cloud.firestore {
       );
 
       // Excluir Doses: Apenas o Paciente
-      allow delete: if ownsExisting();
+      allow delete: if ownsExisting() && resource.data.status == 'PENDENTE';
+    }
+
+
+    // ============================================================
+    // ALERTAS OPERACIONAIS DAS DOSES
+    // ============================================================
+
+    function donoDoAlerta(alertaId) {
+      let dosePath = /databases/$(database)/documents/doses/$(alertaId);
+      return signedIn() && (
+        (resource != null && resource.data.get('usuarioId', '') == request.auth.uid) ||
+        (exists(dosePath) && get(dosePath).data.usuarioId == request.auth.uid &&
+          (resource == null ||
+            (resource.data.get('usuarioId', '') == '' &&
+              resource.data.get('doseId', alertaId) == alertaId)))
+      );
+    }
+
+    match /alertas/{alertaId} {
+      // Current alert documents carry usuarioId. Legacy documents are
+      // accessible only through their matching dose ID and owned dose.
+      allow get, delete: if donoDoAlerta(alertaId);
     }
 
 

@@ -230,18 +230,32 @@ class MedicamentoViewModel(
         }
     }
 
-    fun desativar(medicamentoId: String, onSucesso: () -> Unit = {}) {
+    fun excluir(
+        medicamentoId: String,
+        aoExcluir: (MedicamentoRepository.ResultadoExclusao) -> Result<Unit> = { Result.success(Unit) }
+    ) {
         _uiState.update { it.copy(isLoadingLista = true, erro = null) }
         viewModelScope.launch {
-            repository.desativar(medicamentoId).fold(
-                onSuccess = {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingLista = false,
-                            sucessoMensagem = "Medicamento removido."
-                        )
-                    }
-                    onSucesso()
+            repository.excluir(medicamentoId).fold(
+                onSuccess = { resultado ->
+                    aoExcluir(resultado).fold(
+                        onSuccess = {
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingLista = false,
+                                    sucessoMensagem = "Medicamento excluído. ${resultado.doseIdsRemovidas.size} dose(s) futura(s) removida(s); histórico preservado."
+                                )
+                            }
+                        },
+                        onFailure = { falhaLocal ->
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingLista = false,
+                                    erro = "Medicamento excluído do servidor, mas não foi possível cancelar os alarmes deste aparelho: ${falhaLocal.localizedMessage ?: "erro local"}. Reabra o app para sincronizar os lembretes."
+                                )
+                            }
+                        }
+                    )
                 },
                 onFailure = { falha ->
                     _uiState.update {

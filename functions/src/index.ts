@@ -67,7 +67,10 @@ export const limparDadosMedicacao = functions.https.onCall(async (_data, context
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
     console.error("Falha ao limpar dados de medicação do usuário autenticado.", error);
-    throw new functions.https.HttpsError("internal", "A limpeza não foi concluída integralmente. Tente novamente.");
+    const etapa = error instanceof Error && error.message.startsWith("Falha ao ")
+      ? error.message
+      : "A limpeza não foi concluída integralmente.";
+    throw new functions.https.HttpsError("internal", `${etapa} Tente novamente; a operação pode ser repetida com segurança.`);
   }
 });
 

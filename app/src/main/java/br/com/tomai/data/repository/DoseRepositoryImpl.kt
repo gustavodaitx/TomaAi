@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -80,7 +81,7 @@ class DoseRepositoryImpl(
             .whereEqualTo("usuarioId", pacienteUid)
             .whereGreaterThanOrEqualTo("dataAgenda", dataInicio)
             .whereLessThanOrEqualTo("dataAgenda", dataFim)
-            .get()
+            .get(Source.SERVER)
             .await()
         val doses = snapshot.documents.mapNotNull { document ->
             runCatching { Dose.fromFirestoreMap(document.id, document.data ?: emptyMap()) }.getOrNull()
@@ -93,16 +94,37 @@ class DoseRepositoryImpl(
         usuarioId: String,
         medicamentos: List<Medicamento>,
         dataAgenda: String
-    ): Result<Unit> {
+    ): Result<Set<String>> {
         return try {
             val authenticatedUid = auth.currentUser?.uid
                 ?: return Result.failure(IllegalStateException("Sessão expirada. Faça login novamente."))
             val pacienteUid = pacienteVinculadoResolver.resolverUidPaciente(usuarioId)
             if (pacienteUid == null || pacienteUid != authenticatedUid) {
-                return Result.success(Unit)
+                return Result.success(emptySet())
             }
-            if (medicamentos.any { it.ativo && it.usuarioId != authenticatedUid }) {
-                return Result.failure(IllegalStateException("A agenda contém medicamentos de outro usuário."))
+            // Listener snapshots can initially come from the local cache. A stale
+            // cached medication must never recreate doses after a server cleanup.
+            val documentosMedicamentos = firestore.collection(MedicamentoRepositoryImpl.COLECAO_MEDICAMENTOS)
+                .whereEqualTo("usuarioId", authenticatedUid)
+                .get(Source.SERVER)
+                .await()
+                .documents
+            val medicamentosBloqueados = documentosMedicamentos.count {
+                medicineDocumentBlocksDoseGeneration(it.data ?: emptyMap())
+            }
+            val medicamentosDoServidor = documentosMedicamentos
+                .filter { documento -> !medicineDocumentBlocksDoseGeneration(documento.data ?: emptyMap()) }
+                .mapNotNull { documento ->
+                    runCatching {
+                        Medicamento.fromFirestoreMap(documento.id, documento.data ?: emptyMap())
+                    }.getOrNull()
+                }
+            if (medicamentosBloqueados > 0) {
+                Log.i(
+                    TAG,
+                    "agenda_sincronizacao uid=$authenticatedUid data=$dataAgenda " +
+                        "medicamentosEmExclusaoIgnorados=$medicamentosBloqueados"
+                )
             }
 
             // Evita get() em IDs que ainda não existem: a regra de leitura depende de
@@ -111,14 +133,14 @@ class DoseRepositoryImpl(
             val dosesExistentes = firestore.collection(COLECAO_DOSES)
                 .whereEqualTo("usuarioId", authenticatedUid)
                 .whereEqualTo("dataAgenda", dataAgenda)
-                .get()
+                .get(Source.SERVER)
                 .await()
                 .documents
                 .associateBy { it.id }
 
-            var batch = firestore.batch()
-            var operacoes = 0
-            val medicamentosValidosNoDia = medicamentos.asSequence()
+            var dosesCriadasOuAtualizadas = 0
+            var dosesRemovidasPorAgendaInvalida = 0
+            val medicamentosValidosNoDia = medicamentosDoServidor.asSequence()
                 .filter { medicamento ->
                     val data = runCatching { java.time.LocalDate.parse(dataAgenda) }.getOrNull()
                         ?: return@filter false
@@ -130,61 +152,89 @@ class DoseRepositoryImpl(
                 }
                 .associateBy { it.id }
 
-            medicamentos.filter { it.ativo }.forEach medicamentoLoop@ { medicamento ->
+            medicamentosDoServidor.filter { it.ativo }.forEach medicamentoLoop@ { medicamento ->
                 val data = runCatching { java.time.LocalDate.parse(dataAgenda) }.getOrNull()
                     ?: return@medicamentoLoop
                 if (medicamento.dataInicio.isNotBlank() && dataAgenda < medicamento.dataInicio) return@medicamentoLoop
                 if (medicamento.dataFim.isNotBlank() && dataAgenda > medicamento.dataFim) return@medicamentoLoop
                 if (medicamento.frequencia == Medicamento.FREQUENCIA_PERSONALIZADA &&
                     data.dayOfWeek.value !in medicamento.diasSemana) return@medicamentoLoop
-                medicamento.horarios.forEach { horario ->
-                    if (horario.hora.isBlank()) return@forEach
-                    val doseId = Dose.idDeterministico(
-                        usuarioId = authenticatedUid,
-                        dataAgenda = dataAgenda,
-                        medicamentoId = medicamento.id,
-                        horarioProgramado = horario.hora
-                    )
-                    val docRef = firestore.collection(COLECAO_DOSES).document(doseId)
-                    if (doseId !in dosesExistentes) {
-                        val dose = Dose(
-                            id = doseId,
+
+                val horariosValidos = medicamento.horarios.filter { it.hora.isNotBlank() }
+                var bloqueadoDuranteGeracao = false
+                horariosValidos.chunked(450).forEach loteLoop@ { loteHorarios ->
+                    val batchMedicamento = firestore.batch()
+                    loteHorarios.forEach { horario ->
+                        val doseId = Dose.idDeterministico(
                             usuarioId = authenticatedUid,
-                            medicamentoId = medicamento.id,
-                            medicamentoNome = medicamento.nome,
-                            dosagem = medicamento.dosagem,
                             dataAgenda = dataAgenda,
-                            horarioProgramado = horario.hora,
-                            status = Dose.STATUS_PENDENTE
+                            medicamentoId = medicamento.id,
+                            horarioProgramado = horario.hora
                         )
-                        check(dose.usuarioId == authenticatedUid) {
-                            "A dose precisa pertencer ao usuário autenticado antes do batch."
+                        val docRef = firestore.collection(COLECAO_DOSES).document(doseId)
+                        if (doseId !in dosesExistentes) {
+                            val dose = Dose(
+                                id = doseId,
+                                usuarioId = authenticatedUid,
+                                medicamentoId = medicamento.id,
+                                medicamentoNome = medicamento.nome,
+                                dosagem = medicamento.dosagem,
+                                dataAgenda = dataAgenda,
+                                horarioProgramado = horario.hora,
+                                status = Dose.STATUS_PENDENTE
+                            )
+                            check(dose.usuarioId == authenticatedUid) {
+                                "A dose precisa pertencer ao usuário autenticado antes do batch."
+                            }
+                            val payload = dose.toMap() + mapOf(
+                                "nomeMedicamento" to dose.medicamentoNome,
+                                "data" to dose.dataAgenda,
+                                "horario" to dose.horarioProgramado,
+                                "criadoEm" to FieldValue.serverTimestamp()
+                            )
+                            batchMedicamento.set(docRef, payload)
+                        } else {
+                            val meta = mapOf(
+                                "usuarioId" to authenticatedUid,
+                                "medicamentoNome" to medicamento.nome,
+                                "nomeMedicamento" to medicamento.nome,
+                                "dosagem" to medicamento.dosagem
+                            )
+                            batchMedicamento.set(docRef, meta, SetOptions.merge())
                         }
-                        val payload = dose.toMap() + mapOf(
-                            "nomeMedicamento" to dose.medicamentoNome,
-                            "data" to dose.dataAgenda,
-                            "horario" to dose.horarioProgramado,
-                            "criadoEm" to FieldValue.serverTimestamp()
-                        )
-                        batch.set(docRef, payload)
-                        operacoes++
-                    } else {
-                        val meta = mapOf(
-                            "usuarioId" to authenticatedUid,
-                            "medicamentoNome" to medicamento.nome,
-                            "nomeMedicamento" to medicamento.nome,
-                            "dosagem" to medicamento.dosagem
-                        )
-                        batch.set(docRef, meta, SetOptions.merge())
-                        operacoes++
                     }
-                    if (operacoes == 450) {
-                        batch.commit().await()
-                        batch = firestore.batch()
-                        operacoes = 0
+
+                    try {
+                        batchMedicamento.commit().await()
+                        dosesCriadasOuAtualizadas += loteHorarios.size
+                    } catch (falha: Exception) {
+                        val codigoErro = (falha as? com.google.firebase.firestore.FirebaseFirestoreException)
+                            ?.code
+                        val medicamentoAtual = firestore.collection(MedicamentoRepositoryImpl.COLECAO_MEDICAMENTOS)
+                            .whereEqualTo("usuarioId", authenticatedUid)
+                            .whereEqualTo(com.google.firebase.firestore.FieldPath.documentId(), medicamento.id)
+                            .get(Source.SERVER)
+                            .await()
+                        if (codigoErro == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED &&
+                            (medicamentoAtual.isEmpty || medicamentoAtual.documents.single()
+                                .getBoolean("exclusaoEmAndamento") == true)
+                        ) {
+                            Log.i(
+                                TAG,
+                                "agenda_sincronizacao_pulada medicamentoEmExclusao uid=$authenticatedUid " +
+                                    "medicamentoId=${medicamento.id} codigo=${codigoErro.name}"
+                            )
+                            bloqueadoDuranteGeracao = true
+                            return@loteLoop
+                        }
+                        throw falha
                     }
                 }
+                if (bloqueadoDuranteGeracao) return@medicamentoLoop
             }
+
+            var batch = firestore.batch()
+            var operacoes = 0
 
             // Uma edição/inativação não deve deixar lembretes futuros para horários removidos.
             val zonaAtual = java.time.ZoneId.systemDefault()
@@ -204,6 +254,7 @@ class DoseRepositoryImpl(
                     if (!horarioContinuaValido) {
                         batch.delete(doseDocument.reference)
                         operacoes++
+                        dosesRemovidasPorAgendaInvalida++
                         if (operacoes == 450) {
                             batch.commit().await()
                             batch = firestore.batch()
@@ -216,9 +267,18 @@ class DoseRepositoryImpl(
             if (operacoes > 0) {
                 batch.commit().await()
             }
-            Result.success(Unit)
+            Log.i(
+                TAG,
+                "agenda_sincronizacao_concluida uid=$authenticatedUid data=$dataAgenda " +
+                    "medicamentosAtivos=${medicamentosValidosNoDia.size} " +
+                    "dosesCriadasOuAtualizadas=$dosesCriadasOuAtualizadas " +
+                    "dosesRemovidasPorAgendaInvalida=$dosesRemovidasPorAgendaInvalida"
+            )
+            Result.success(medicamentosValidosNoDia.keys)
         } catch (e: Exception) {
-            Log.e(TAG, "garantirAgendaDiaria: ${e.message}", e)
+            val codigoErro = (e as? com.google.firebase.firestore.FirebaseFirestoreException)?.code?.name
+                ?: e.javaClass.simpleName
+            Log.e(TAG, "agenda_sincronizacao_falha colecao=$COLECAO_DOSES codigo=$codigoErro detalhe=${e.message}", e)
             Result.failure(Exception(mapearErro(e)))
         }
     }
@@ -271,3 +331,6 @@ class DoseRepositoryImpl(
             ?: "Não foi possível atualizar a dose. Tente novamente."
     }
 }
+
+internal fun medicineDocumentBlocksDoseGeneration(data: Map<String, Any?>): Boolean =
+    data["exclusaoEmAndamento"] == true

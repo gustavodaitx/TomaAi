@@ -14,7 +14,7 @@ interface DoseRepository {
         usuarioId: String,
         medicamentos: List<Medicamento>,
         dataAgenda: String
-    ): Result<Unit>
+    ): Result<Set<String>>
 
     suspend fun atualizarStatus(
         doseId: String,
