@@ -56,7 +56,9 @@ service cloud.firestore {
 
     match /usuarios/{userId} {
 
-      allow read: if owns(userId);
+      // Authenticated users need to resolve a patient from the shared link code.
+      // Keep this broad read aligned with the current client-side lookup flow.
+      allow read: if signedIn();
 
       // Permite a criação do próprio documento de usuário autenticado
       allow create: if owns(userId)

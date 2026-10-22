@@ -227,6 +227,7 @@ class AuthRepositoryImpl(
         perfil: String
     ): Result<Usuario> {
         var usuarioAutenticado = auth.currentUser
+        var contaAuthCriadaNesteFluxo = false
         return try {
             if (usuarioAutenticado != null && !usuarioAutenticado.email.equals(email.trim(), ignoreCase = true)) {
                 return Result.failure(AuthRepositoryException("Existe uma sessao ativa com outro e-mail. Encerre-a antes de cadastrar."))
@@ -235,6 +236,7 @@ class AuthRepositoryImpl(
             if (usuarioAutenticado == null) {
                 usuarioAutenticado = try {
                     val authResult = auth.createUserWithEmailAndPassword(email.trim(), senha).await()
+                    contaAuthCriadaNesteFluxo = true
                     auth.currentUser ?: authResult.user
                 } catch (_: FirebaseAuthUserCollisionException) {
                     val loginResult = auth.signInWithEmailAndPassword(email.trim(), senha).await()
@@ -264,6 +266,23 @@ class AuthRepositoryImpl(
             val uid = firebaseUser.uid
             val emailSalvo = firebaseUser.email ?: email.trim()
             val codigoDigitado = codigoPaciente?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+            val exigeVinculo = perfilCadastro == Usuario.PERFIL_PESSOA_DE_CONFIANCA ||
+                perfilCadastro == Usuario.PERFIL_CUIDADOR
+            if (exigeVinculo && codigoDigitado == null) {
+                throw IllegalArgumentException("Informe o código do paciente para concluir o vínculo.")
+            }
+
+            // Resolve the patient before writing the caregiver profile. A failed lookup
+            // must not leave a successful-looking profile without its required link.
+            val pacienteUidVinculado = if (exigeVinculo) {
+                val snapshot = firestore.collection(COLECAO_USUARIOS)
+                    .whereEqualTo("codigoPaciente", codigoDigitado)
+                    .whereEqualTo("perfil", Usuario.PERFIL_PACIENTE)
+                    .get()
+                    .await()
+                snapshot.documents.firstOrNull { it.id != uid }?.id
+                    ?: throw IllegalStateException("Código do paciente inválido ou não encontrado.")
+            } else null
             val codigoGerado = if (perfilCadastro == Usuario.PERFIL_PACIENTE) {
                 gerarCodigoLocalmente()
             } else null
@@ -278,51 +297,47 @@ class AuthRepositoryImpl(
                 codigoVinculo = codigoGerado,
                 codigoPaciente = codigoGerado,
                 codigoPacienteDigitado = codigoDigitado,
+                pacienteUid = pacienteUidVinculado,
                 aceitouReceberAvisos = true
             )
             val dadosUsuario = usuario.toMap() + mapOf(
                 "codigoPaciente" to codigoGerado,
                 "codigoVinculo" to codigoGerado,
-                "pacienteUid" to null
+                "pacienteUid" to pacienteUidVinculado
             )
             val usuarioRef = firestore.collection(COLECAO_USUARIOS).document(uid)
-            usuarioRef.set(dadosUsuario, SetOptions.merge()).await()
-
-            if (perfilCadastro != Usuario.PERFIL_PACIENTE && codigoDigitado != null) {
-                try {
-                    val snapshot = firestore.collection(COLECAO_USUARIOS)
-                        .whereEqualTo("codigoPaciente", codigoDigitado)
-                        .whereEqualTo("perfil", Usuario.PERFIL_PACIENTE)
-                        .get()
-                        .await()
-                    val paciente = snapshot.documents.firstOrNull { it.id != uid }
-                    if (paciente != null) {
-                        val pacienteUid = paciente.id
-                        val vinculoId = "${pacienteUid}_$uid"
-                        firestore.collection("vinculos").document(vinculoId).set(
-                            mapOf(
-                                "pacienteUid" to pacienteUid,
-                                "cuidadorUid" to uid,
-                                "ativo" to true,
-                                "criadoEm" to FieldValue.serverTimestamp()
-                            )
-                        ).await()
-                        runCatching { usuarioRef.update("pacienteUid", pacienteUid).await() }
-                            .onFailure {
-                                Log.e(TAG, "Vínculo criado, mas não foi possível atualizar pacienteUid no perfil.", it)
-                            }
-                        Log.d(TAG, "Cadastro vinculado ao paciente $pacienteUid.")
-                        return Result.success(usuario.copy(pacienteUid = pacienteUid))
-                    }
-                    Log.w(TAG, "Código de paciente digitado não foi encontrado no Firestore.")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Erro ao vincular por código no fallback local", e)
-                }
+            val batch = firestore.batch()
+            batch.set(usuarioRef, dadosUsuario, SetOptions.merge())
+            pacienteUidVinculado?.let { pacienteUid ->
+                val vinculoId = "${pacienteUid}_$uid"
+                batch.set(
+                    firestore.collection("vinculos").document(vinculoId),
+                    mapOf(
+                        "pacienteUid" to pacienteUid,
+                        "cuidadorUid" to uid,
+                        "ativo" to true,
+                        "criadoEm" to FieldValue.serverTimestamp()
+                    )
+                )
+            }
+            batch.commit().await()
+            if (pacienteUidVinculado != null) {
+                Log.d(TAG, "Cadastro vinculado ao paciente $pacienteUidVinculado.")
             }
 
             return Result.success(usuario)
         } catch (e: Exception) {
             Log.e(TAG, "cadastrar: Falha no fluxo de cadastro: ${e.message}", e)
+            if (contaAuthCriadaNesteFluxo) {
+                runCatching {
+                    auth.currentUser?.delete()?.await()
+                    auth.signOut()
+                }.onSuccess {
+                    usuarioAutenticado = null
+                }.onFailure { erroRollback ->
+                    Log.e(TAG, "Não foi possível remover a conta Auth criada após falha no cadastro.", erroRollback)
+                }
+            }
             val pendente = usuarioAutenticado != null || auth.currentUser != null
             val mensagem = if (pendente) {
                 "Sua conta foi criada, mas nao foi possivel confirmar o cadastro. Tente novamente."

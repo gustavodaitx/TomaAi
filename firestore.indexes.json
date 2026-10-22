@@ -37,6 +37,22 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "usuarioId", "order": "ASCENDING" },
+        { "fieldPath": "ativo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vinculos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "cuidadorUid", "order": "ASCENDING" },
+        { "fieldPath": "ativo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "medicamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioId", "order": "ASCENDING" },
         { "fieldPath": "__name__", "order": "ASCENDING" }
       ]
     },
