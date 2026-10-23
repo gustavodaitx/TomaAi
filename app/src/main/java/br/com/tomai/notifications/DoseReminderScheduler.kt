@@ -16,13 +16,14 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 
+internal const val INTERVALO_REPETICAO_LEMBRETE_MS = 2 * 60 * 1000L
+
 /** Mantém os alarmes locais sincronizados com a agenda do usuário autenticado neste aparelho. */
 object DoseReminderScheduler {
     private const val TAG = "TOMAI_NOTIFICACOES"
     private const val PREFS = "lembretes_medicamentos"
     private const val KEY_SCHEDULES = "agendamentos"
     private const val KEY_REPEAT_AT = "repetirEm"
-    private const val REPEAT_INTERVAL_MS = 2 * 60 * 1000L
 
     fun sincronizar(
         context: Context,
@@ -38,6 +39,7 @@ object DoseReminderScheduler {
         val previous = all.optJSONArray(uidDoDispositivo) ?: JSONArray()
         val now = System.currentTimeMillis()
         val desired = LinkedHashMap<String, JSONObject>()
+        val idsDeDosesPersistidas = doses.mapTo(mutableSetOf()) { it.id }
 
         val dosesParaAgendar = construirJanela(doses, medicamentos)
         dosesParaAgendar.asSequence()
@@ -51,10 +53,12 @@ object DoseReminderScheduler {
                 val item = JSONObject()
                     .put("doseId", dose.id)
                     .put("usuarioId", dose.usuarioId)
+                    .put("medicamentoId", dose.medicamentoId)
                     .put("nome", dose.medicamentoNome)
                     .put("dosagem", dose.dosagem)
                     .put("horario", dose.horarioProgramado)
                     .put("data", dose.dataAgenda)
+                    .put("doseSemDocumento", dose.id !in idsDeDosesPersistidas)
                 if (repeating) item.put(KEY_REPEAT_AT, prior!!.optLong(KEY_REPEAT_AT))
                 desired[dose.id] = item
             }
@@ -100,7 +104,7 @@ object DoseReminderScheduler {
             for (index in 0 until old.length()) {
                 val schedule = old.optJSONObject(index) ?: continue
                 val repeatAt = schedule.optLong(KEY_REPEAT_AT, 0L)
-                val trigger = if (repeatAt > 0L) maxOf(repeatAt, now + REPEAT_INTERVAL_MS) else triggerMillis(schedule) ?: continue
+                val trigger = if (repeatAt > 0L) maxOf(repeatAt, now + INTERVALO_REPETICAO_LEMBRETE_MS) else triggerMillis(schedule) ?: continue
                 if (repeatAt == 0L && trigger <= now) continue
                 if (repeatAt > 0L) schedule.put(KEY_REPEAT_AT, trigger)
                 agendar(appContext, uid, schedule, trigger)
@@ -144,7 +148,7 @@ object DoseReminderScheduler {
         val schedules = all.optJSONArray(deviceUid) ?: return
         val schedule = (0 until schedules.length()).mapNotNull(schedules::optJSONObject)
             .firstOrNull { it.optString("doseId") == doseId } ?: return
-        val next = System.currentTimeMillis() + REPEAT_INTERVAL_MS
+        val next = System.currentTimeMillis() + INTERVALO_REPETICAO_LEMBRETE_MS
         schedule.put(KEY_REPEAT_AT, next)
         schedule.put("nome", nome)
         schedule.put("dosagem", dosagem)
@@ -263,6 +267,10 @@ object DoseReminderScheduler {
             this.data = uri(deviceUid, doseId)
             putExtra(DoseReminderReceiver.EXTRA_DEVICE_UID, deviceUid)
             putExtra(DoseReminderReceiver.EXTRA_DOSE_ID, doseId)
+            putExtra(DoseReminderReceiver.EXTRA_PACIENTE_UID, data.optString("usuarioId"))
+            putExtra(DoseReminderReceiver.EXTRA_MEDICAMENTO_ID, data.optString("medicamentoId"))
+            putExtra(DoseReminderReceiver.EXTRA_DATA_AGENDA, data.optString("data"))
+            putExtra(DoseReminderReceiver.EXTRA_DOSE_SEM_DOCUMENTO, data.optBoolean("doseSemDocumento"))
             putExtra(DoseReminderReceiver.EXTRA_MEDICAMENTO_NOME, data.optString("nome"))
             putExtra(DoseReminderReceiver.EXTRA_DOSAGEM, data.optString("dosagem"))
             putExtra(DoseReminderReceiver.EXTRA_HORARIO, data.optString("horario"))
@@ -302,8 +310,22 @@ object DoseReminderScheduler {
                     if (runCatching { LocalTime.parse(horario.hora) }.isFailure) return@horarioLoop
                     if (offset == 0) {
                         val doseAtual = dosesDeHoje["${medicamento.id}|${horario.hora}"]
-                        if (doseAtual?.status != Dose.STATUS_PENDENTE) return@horarioLoop
-                        resultado += doseAtual
+                        if (doseAtual != null && doseAtual.status != Dose.STATUS_PENDENTE) return@horarioLoop
+                        resultado += doseAtual ?: Dose(
+                            id = Dose.idDeterministico(
+                                medicamento.usuarioId,
+                                dataIso,
+                                medicamento.id,
+                                horario.hora
+                            ),
+                            usuarioId = medicamento.usuarioId,
+                            medicamentoId = medicamento.id,
+                            medicamentoNome = medicamento.nome,
+                            dosagem = medicamento.dosagem,
+                            dataAgenda = dataIso,
+                            horarioProgramado = horario.hora,
+                            status = Dose.STATUS_PENDENTE
+                        )
                     } else {
                         resultado += Dose(
                             id = Dose.idDeterministico(
@@ -342,6 +364,8 @@ object DoseReminderScheduler {
     private fun sameSchedule(first: JSONObject, second: JSONObject): Boolean =
         first.optString("data") == second.optString("data") &&
             first.optString("horario") == second.optString("horario") &&
+            first.optString("medicamentoId") == second.optString("medicamentoId") &&
+            first.optBoolean("doseSemDocumento") == second.optBoolean("doseSemDocumento") &&
             first.optString("nome") == second.optString("nome") &&
             first.optString("dosagem") == second.optString("dosagem")
 

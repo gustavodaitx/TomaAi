@@ -5,7 +5,6 @@ import { criarClienteNoAsaas } from "./asaas/clientes";
 import { cancelarAssinaturaNoAsaas, criarAssinaturaNoAsaas } from "./asaas/assinaturas";
 import { obterPixDaCobranca, removerCobrancaPendente, sincronizarCobrancasNoAsaas } from "./asaas/cobrancas";
 import { processarAsaasWebhook } from "./webhooks/asaasWebhook";
-import { verificarDosesNaoConfirmadas } from "./alerts/verificarDosesNaoConfirmadas";
 import { obterPlanosPadrao } from "./asaas/planos";
 import { gerarCobrancasQuinzenais } from "./asaas/gerarCobrancasQuinzenais";
 import { criarPerfilPessoaDeConfianca as criarPerfilPessoaDeConfiancaNoFirestore, ErroCadastroPessoaDeConfianca } from "./usuarios/cadastroPessoaDeConfianca";
@@ -195,5 +194,4 @@ export const cancelarAssinaturaAsaas = functions.https.onCall(async (data, conte
 });
 
 export const asaasWebhook = functions.https.onRequest(processarAsaasWebhook);
-export { verificarDosesNaoConfirmadas };
 export { gerarCobrancasQuinzenais };

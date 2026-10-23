@@ -66,6 +66,7 @@ import br.com.tomai.ui.theme.TomaAiTheme
 import br.com.tomai.model.Dose
 import br.com.tomai.viewmodel.AuthViewModel
 import br.com.tomai.viewmodel.DoseViewModel
+import br.com.tomai.notifications.DoseNotificationHelper
 import br.com.tomai.notifications.DoseReminderScheduler
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.tasks.await
@@ -134,6 +135,7 @@ fun HomeScreen(
     }
     LaunchedEffect(uid) {
         if (uid.isNotBlank()) {
+            DoseNotificationHelper.garantirCanal(context)
             doseViewModel.iniciar(uid)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -202,7 +204,10 @@ fun HomeScreen(
                     IconButton(onClick = onNavegarConfiguracoes) {
                         Icon(Icons.Filled.Settings, contentDescription = "Configurações")
                     }
-                    IconButton(onClick = { viewModel.logout(onConcluido = onLogoutConcluido) }) {
+                    IconButton(onClick = {
+                        if (uid.isNotBlank()) DoseReminderScheduler.limparAgendamentos(context, uid)
+                        viewModel.logout(onConcluido = onLogoutConcluido)
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Sair")
                     }
                 },

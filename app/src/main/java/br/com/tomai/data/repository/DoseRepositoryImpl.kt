@@ -99,8 +99,31 @@ class DoseRepositoryImpl(
             val authenticatedUid = auth.currentUser?.uid
                 ?: return Result.failure(IllegalStateException("Sessão expirada. Faça login novamente."))
             val pacienteUid = pacienteVinculadoResolver.resolverUidPaciente(usuarioId)
-            if (pacienteUid == null || pacienteUid != authenticatedUid) {
+            if (pacienteUid == null) {
                 return Result.success(emptySet())
+            }
+            if (pacienteUid != authenticatedUid) {
+                // A pessoa de confiança pode agendar no próprio aparelho, mas não
+                // pode criar/atualizar documentos de dose em nome do paciente.
+                val medicamentosDoPaciente = firestore.collection(MedicamentoRepositoryImpl.COLECAO_MEDICAMENTOS)
+                    .whereEqualTo("usuarioId", pacienteUid)
+                    .get(Source.SERVER)
+                    .await()
+                    .documents
+                    .filter { !medicineDocumentBlocksDoseGeneration(it.data ?: emptyMap()) }
+                    .mapNotNull { documento ->
+                        runCatching {
+                            Medicamento.fromFirestoreMap(documento.id, documento.data ?: emptyMap())
+                        }.getOrNull()
+                    }
+                val idsValidos = medicamentosDoPaciente
+                    .filter { it.ehValidoNaData(pacienteUid, dataAgenda) }
+                    .mapTo(mutableSetOf()) { it.id }
+                Log.i(
+                    TAG,
+                    "agenda_lembretes_pessoa_confianca medicamentosValidos=${idsValidos.size} dosesCriadas=0"
+                )
+                return Result.success(idsValidos)
             }
             // Listener snapshots can initially come from the local cache. A stale
             // cached medication must never recreate doses after a server cleanup.
@@ -141,15 +164,7 @@ class DoseRepositoryImpl(
             var dosesCriadasOuAtualizadas = 0
             var dosesRemovidasPorAgendaInvalida = 0
             val medicamentosValidosNoDia = medicamentosDoServidor.asSequence()
-                .filter { medicamento ->
-                    val data = runCatching { java.time.LocalDate.parse(dataAgenda) }.getOrNull()
-                        ?: return@filter false
-                    medicamento.ativo &&
-                        (medicamento.dataInicio.isBlank() || dataAgenda >= medicamento.dataInicio) &&
-                        (medicamento.dataFim.isBlank() || dataAgenda <= medicamento.dataFim) &&
-                        (medicamento.frequencia != Medicamento.FREQUENCIA_PERSONALIZADA ||
-                            data.dayOfWeek.value in medicamento.diasSemana)
-                }
+                .filter { medicamento -> medicamento.ehValidoNaData(authenticatedUid, dataAgenda) }
                 .associateBy { it.id }
 
             medicamentosDoServidor.filter { it.ativo }.forEach medicamentoLoop@ { medicamento ->
@@ -334,3 +349,15 @@ class DoseRepositoryImpl(
 
 internal fun medicineDocumentBlocksDoseGeneration(data: Map<String, Any?>): Boolean =
     data["exclusaoEmAndamento"] == true
+
+internal fun Medicamento.ehValidoNaData(pacienteUid: String, dataAgenda: String): Boolean {
+    if (id.isBlank() || usuarioId != pacienteUid || !ativo) return false
+    val data = runCatching { java.time.LocalDate.parse(dataAgenda) }.getOrNull() ?: return false
+    val inicio = if (dataInicio.isBlank()) null
+    else runCatching { java.time.LocalDate.parse(dataInicio) }.getOrNull() ?: return false
+    val fim = if (dataFim.isBlank()) null
+    else runCatching { java.time.LocalDate.parse(dataFim) }.getOrNull() ?: return false
+    if (inicio != null && data.isBefore(inicio)) return false
+    if (fim != null && data.isAfter(fim)) return false
+    return frequencia != Medicamento.FREQUENCIA_PERSONALIZADA || data.dayOfWeek.value in diasSemana
+}
