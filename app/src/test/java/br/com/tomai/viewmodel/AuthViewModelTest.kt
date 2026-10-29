@@ -59,6 +59,7 @@ class AuthViewModelTest {
         val state = viewModel.uiState.value
         assertEquals("Digite um e-mail válido.", state.erro)
         assertFalse(state.isLoading)
+        assertEquals(0, fakeRepository.quantidadeChamadasLogin)
     }
 
     @Test
@@ -334,6 +335,7 @@ class FakeAuthRepository : AuthRepository {
     var mensagemFalha: String = "Erro simulado"
     var falhaCadastro: Throwable? = null
     var bloqueioCadastro: CompletableDeferred<Unit>? = null
+    var quantidadeChamadasLogin: Int = 0
     var quantidadeChamadasCadastro: Int = 0
     var perfilCadastro: String? = null
     var codigoPacienteCadastro: String? = null
@@ -343,6 +345,7 @@ class FakeAuthRepository : AuthRepository {
     override fun estaAutenticado(): Boolean = _usuarioAtualFlow.value != null
 
     override suspend fun login(email: String, senha: String): Result<Usuario> {
+        quantidadeChamadasLogin += 1
         if (deveFalhar) return Result.failure(Exception(mensagemFalha))
         val user = Usuario(
             id = "mock_uid_123",
