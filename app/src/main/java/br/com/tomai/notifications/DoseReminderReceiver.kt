@@ -20,8 +20,10 @@ class DoseReminderReceiver : BroadcastReceiver() {
         val nome = intent.getStringExtra(EXTRA_MEDICAMENTO_NOME).orEmpty()
         val dosagem = intent.getStringExtra(EXTRA_DOSAGEM).orEmpty()
         val horario = intent.getStringExtra(EXTRA_HORARIO).orEmpty()
+        val patientUid = intent.getStringExtra(EXTRA_PATIENT_UID).orEmpty()
+        Log.i(TAG, "receiver_entrada uidDispositivo=$deviceUid doseId=$doseId horario=$horario")
         if (doseId.isBlank() || deviceUid.isBlank()) {
-            Log.w("TOMAI_NOTIFICACOES", "Evento de lembrete ignorado por dados incompletos.")
+            Log.w(TAG, "receiver_rejeitado motivo=dados_incompletos")
             return
         }
         val pendingResult = goAsync()
@@ -39,16 +41,22 @@ class DoseReminderReceiver : BroadcastReceiver() {
                     null
                 }
                 val dose = snapshot?.takeIf { it.exists() }?.data
-                if (snapshot != null && (dose == null || dose["status"] != STATUS_PENDENTE)) {
+                if (snapshot?.exists() == true && (dose == null || dose["status"] != STATUS_PENDENTE)) {
+                    Log.i(TAG, "receiver_rejeitado uidDispositivo=$deviceUid doseId=$doseId motivo=" +
+                        if (dose == null) "dose_ausente" else "status_${dose["status"]}")
                     DoseReminderScheduler.cancelarRepeticao(context, deviceUid, doseId)
                     DoseNotificationHelper.cancelarLembrete(context, notificationId(deviceUid, doseId))
                     return@launch
                 }
-                if (dose != null) {
-                    val autorizado = runCatching { destinatarioAindaAutorizado(deviceUid, dose) }
+                if (snapshot != null) {
+                    val autorizado = runCatching {
+                        if (dose == null) destinatarioAindaAutorizado(deviceUid, patientUid)
+                        else destinatarioAindaAutorizado(deviceUid, dose)
+                    }
                         .onFailure { Log.w(TAG, "Não foi possível confirmar o vínculo no servidor.", it) }
                         .getOrNull()
                     if (autorizado == false) {
+                        Log.i(TAG, "receiver_rejeitado uidDispositivo=$deviceUid doseId=$doseId motivo=vinculo_ou_consentimento")
                         DoseReminderScheduler.cancelarRepeticao(context, deviceUid, doseId)
                         DoseNotificationHelper.cancelarLembrete(context, notificationId(deviceUid, doseId))
                         return@launch
@@ -65,6 +73,8 @@ class DoseReminderReceiver : BroadcastReceiver() {
                         "Confira sua dose programada para $horario."
                     }
                 )
+                Log.i(TAG, "receiver_concluido uidDispositivo=$deviceUid doseId=$doseId " +
+                    "estadoRemoto=${if (snapshot == null) "indisponivel" else "consultado"} repeticao=agendada")
             } finally {
                 pendingResult.finish()
             }
@@ -73,6 +83,11 @@ class DoseReminderReceiver : BroadcastReceiver() {
 
     private suspend fun destinatarioAindaAutorizado(deviceUid: String, dose: Map<String, Any?>): Boolean {
         val patientUid = dose["usuarioId"] as? String ?: return false
+        return destinatarioAindaAutorizado(deviceUid, patientUid)
+    }
+
+    private suspend fun destinatarioAindaAutorizado(deviceUid: String, patientUid: String): Boolean {
+        if (patientUid.isBlank()) return false
         val auth = FirebaseAuth.getInstance()
         if (auth.currentUser?.uid != deviceUid) return false
         val firestore = FirebaseFirestore.getInstance()
@@ -98,6 +113,7 @@ class DoseReminderReceiver : BroadcastReceiver() {
         const val EXTRA_MEDICAMENTO_NOME = "extra_medicamento_nome"
         const val EXTRA_DOSAGEM = "extra_dosagem"
         const val EXTRA_HORARIO = "extra_horario"
+        const val EXTRA_PATIENT_UID = "extra_patient_uid"
         private const val TAG = "TOMAI_NOTIFICACOES"
         private const val STATUS_PENDENTE = "PENDENTE"
     }

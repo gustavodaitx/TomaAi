@@ -30,7 +30,10 @@ object DoseReminderScheduler {
         doses: List<Dose>,
         medicamentos: List<Medicamento>
     ) {
-        if (uidDoDispositivo.isBlank()) return
+        if (uidDoDispositivo.isBlank()) {
+            Log.w(TAG, "agendamento_abortado motivo=uid_dispositivo_vazio")
+            return
+        }
         val appContext = context.applicationContext
         doses.forEach { dose -> cancelarAgendamentoLegado(appContext, dose.id) }
         val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -40,14 +43,21 @@ object DoseReminderScheduler {
         val desired = LinkedHashMap<String, JSONObject>()
 
         val dosesParaAgendar = construirJanela(doses, medicamentos)
-        dosesParaAgendar.asSequence()
-            .filter { it.status == Dose.STATUS_PENDENTE && it.id.isNotBlank() }
-            .forEach { dose ->
-                val trigger = triggerMillis(dose) ?: return@forEach
+        Log.i(TAG, "agendamento_iniciado uidDispositivo=$uidDoDispositivo dosesRecebidas=${doses.size} " +
+            "medicamentosRecebidos=${medicamentos.size} dosesElegiveis=${dosesParaAgendar.size}")
+        var dosesInvalidas = 0
+        var dosesNaoPendentes = 0
+        var dosesPassadas = 0
+        dosesParaAgendar.asSequence().forEach { dose ->
+                if (dose.status != Dose.STATUS_PENDENTE || dose.id.isBlank()) {
+                    dosesNaoPendentes++
+                    return@forEach
+                }
+                val trigger = triggerMillis(dose) ?: run { dosesInvalidas++; return@forEach }
                 val prior = (0 until previous.length()).mapNotNull(previous::optJSONObject)
                     .firstOrNull { it.optString("doseId") == dose.id }
                 val repeating = prior != null && prior.optLong(KEY_REPEAT_AT, 0L) > 0L
-                if (trigger <= now && !repeating) return@forEach
+                if (trigger <= now && !repeating) { dosesPassadas++; return@forEach }
                 val item = JSONObject()
                     .put("doseId", dose.id)
                     .put("usuarioId", dose.usuarioId)
@@ -79,11 +89,14 @@ object DoseReminderScheduler {
             val repetirEm = toSchedule.optLong(KEY_REPEAT_AT, 0L)
             if (repetirEm > 0L) agendar(appContext, uidDoDispositivo, toSchedule, repetirEm)
             else agendar(appContext, uidDoDispositivo, toSchedule)
+            Log.d(TAG, "alarme_registrado uidDispositivo=$uidDoDispositivo doseId=$doseId " +
+                "data=${toSchedule.optString("data")} horario=${toSchedule.optString("horario")} repetir=${repetirEm > 0L}")
             next.put(toSchedule)
         }
         all.put(uidDoDispositivo, next)
         prefs.edit().putString(KEY_SCHEDULES, all.toString()).apply()
-        Log.d(TAG, "Agenda local sincronizada: ${desired.size} lembrete(s) para a conta ativa.")
+        Log.i(TAG, "agendamento_concluido uidDispositivo=$uidDoDispositivo alarmes=${desired.size} " +
+            "invalidos=$dosesInvalidas naoPendentes=$dosesNaoPendentes passados=$dosesPassadas")
     }
 
     /** Recria somente alarmes ainda futuros da conta salva neste aparelho. */
@@ -266,6 +279,7 @@ object DoseReminderScheduler {
             putExtra(DoseReminderReceiver.EXTRA_MEDICAMENTO_NOME, data.optString("nome"))
             putExtra(DoseReminderReceiver.EXTRA_DOSAGEM, data.optString("dosagem"))
             putExtra(DoseReminderReceiver.EXTRA_HORARIO, data.optString("horario"))
+            putExtra(DoseReminderReceiver.EXTRA_PATIENT_UID, data.optString("usuarioId"))
         }
         return PendingIntent.getBroadcast(
             context,
